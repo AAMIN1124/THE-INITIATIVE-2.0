@@ -3021,6 +3021,7 @@ elif nav_section == "Integrated Webcam Field Patrol":
             st.error("Hardware webcam device could not be accessed.")
         else:
             clean_tgt = clean_str(target_plate_wb)
+            frame_idx = 0
             current_frame = 0
             prev_t = time.time()
             fps_val = 30.0
@@ -3141,6 +3142,7 @@ elif nav_section == "Mobile Phone IP Camera Scanner":
             st.error(f"Could not connect to {clean_mob}. Ensure Phone and Laptop share the same Wi-Fi network.")
         else:
             clean_tgt = clean_str(target_plate_mob)
+            frame_idx = 0
             current_frame = 0
             prev_t = time.time()
             fps_val = 30.0
