@@ -1164,10 +1164,55 @@ def format_exact_pts(sec_val):
         ms = 999
     return f"{m:02d}:{s:02d}.{ms:03d}"
 
+# ----------------- UNIVERSAL STREAM INGEST & PROBE HELPERS -----------------
+def get_active_stream_url(identifier):
+    if isinstance(identifier, dict):
+        st_id = str(identifier.get("stream_id", "1"))
+        if identifier.get("custom_url"):
+            return identifier["custom_url"].strip()
+    else:
+        st_id = str(identifier)
+        
+    overrides = st.session_state.get("stream_overrides", {})
+    if st_id in overrides and overrides[st_id].strip():
+        return overrides[st_id].strip()
+    if st_id == "JURY" and "JURY" in overrides:
+        return overrides["JURY"].strip()
+    return f"https://live.corp8.cloud/stream/{st_id}"
+
+def probe_stream_connectivity(url, timeout_sec=2.5):
+    if not url or not isinstance(url, str):
+        return False
+    url = url.strip()
+    if url.startswith(("http://", "https://", "rtsp://", "rtmp://")):
+        try:
+            cap_probe = cv2.VideoCapture(url)
+            t0 = time.time()
+            if cap_probe.isOpened():
+                while time.time() - t0 < timeout_sec:
+                    ret, frame = cap_probe.read()
+                    if ret and frame is not None and frame.size > 0:
+                        cap_probe.release()
+                        return True
+                    time.sleep(0.05)
+            cap_probe.release()
+        except Exception:
+            pass
+
+        if url.startswith(("http://", "https://")):
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'SCRB-Command-Terminal/2.0'})
+                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                    if resp.status in [200, 206, 301, 302]:
+                        return True
+            except Exception:
+                pass
+    return False
+
 # ----------------- REAL-TIME ZERO-BUFFER RTSP BACKGROUND WORKER DAEMON -----------------
 def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
     stream_id = cam_obj["stream_id"]
-    stream_url = f"https://live.corp8.cloud/stream/{stream_id}"
+    stream_url = get_active_stream_url(cam_obj)
 
     try:
         yolo_model, ocr_reader = get_ai_models()
@@ -1703,6 +1748,7 @@ if is_edge_mode:
 else:
     st.sidebar.caption("⚪ **Standard Mode:** Full HD 8.4 Mbps Video Stream Decoded")
 
+# ----------------- DYNAMIC JURY / RTSP STREAM OVERRIDE WIDGET -----------------
 st.sidebar.markdown("### 📡 Zero-Delay RTSP Ingest Daemons")
 col_d1, col_d2 = st.sidebar.columns(2)
 cam14_obj = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == "14"), ACTIVE_CCTV_CATALOGUE[0])
@@ -1731,6 +1777,75 @@ if col_d2.button("🟢 CAM-01" if not is_c01_running else "🛑 CAM-01", key="bt
 
 daemon_active_cnt = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
 st.sidebar.caption(f"**Ingest Status:** {daemon_active_cnt}/{MAX_CONCURRENT_DAEMONS} Active | Buffer: {len(st.session_state.get('all_cctv_sightings', []))} Sighting(s)")
+
+with st.sidebar.expander("🔗 Dynamic External Stream Ingest (Jury URL/IP)", expanded=False):
+    jury_stream_url = st.text_input("Custom RTSP / HTTP / IP Camera Stream URL", placeholder="rtsp://admin:pass@ip:port/h264 or http://...", key="jury_stream_url_input")
+    jury_slot = st.selectbox("Assign to Camera Slot", ["Override Cam-01", "Override Cam-14", "Dedicated Jury Live Feed"], key="jury_slot_select")
+    
+    if st.button("⚡ Bind & Start Live Stream Ingestion", use_container_width=True, key="btn_bind_jury_stream"):
+        clean_j_url = jury_stream_url.strip()
+        if not clean_j_url:
+            st.error("Please enter a valid RTSP / HTTP stream URL.")
+        else:
+            with st.spinner("Probing stream connectivity (3s timeout)..."):
+                is_reachable = probe_stream_connectivity(clean_j_url, timeout_sec=2.5)
+                
+            if is_reachable:
+                slot_key = "1" if "Cam-01" in jury_slot else ("14" if "Cam-14" in jury_slot else "JURY")
+                st.session_state.setdefault("stream_overrides", {})[slot_key] = clean_j_url
+                
+                if slot_key == "JURY":
+                    jury_node = {
+                        "stream_id": "JURY",
+                        "cam_id": "CAM-JURY",
+                        "name": "Dedicated Jury Live Feed (Custom Ingest)",
+                        "lat": 23.2156,
+                        "lon": 72.6369,
+                        "city": "Gandhinagar Command",
+                        "type": "Custom RTSP/IP Stream",
+                        "dept": "Jury Evaluation Grid",
+                        "status": "ONLINE",
+                        "verified": True,
+                        "custom_url": clean_j_url
+                    }
+                    ex_i = next((i for i, c in enumerate(ACTIVE_CCTV_CATALOGUE) if str(c.get("stream_id")) == "JURY"), -1)
+                    if ex_i != -1:
+                        ACTIVE_CCTV_CATALOGUE[ex_i] = jury_node
+                    else:
+                        ACTIVE_CCTV_CATALOGUE.insert(0, jury_node)
+                else:
+                    t_cam = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) == slot_key), None)
+                    if t_cam:
+                        t_cam["custom_url"] = clean_j_url
+                        t_cam["type"] = "Overridden Jury Live Feed"
+                        cid = t_cam["cam_id"]
+                        if cid in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS[cid].is_alive():
+                            stop_camera_daemon(cid)
+                            time.sleep(0.05)
+                            start_camera_daemon(t_cam)
+
+                st.success(f"🟢 Stream successfully bound to {jury_slot}!")
+                log_audit_trail(prof['name'], f"Bound Dynamic Stream to {jury_slot}: {clean_j_url}")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.error("⚠️ Stream Unreachable. Verify network connectivity, RTSP credentials, or port forwarding.")
+                if st.button("Force Bind Anyway (Offline Subnet)", key="btn_force_bind_stream"):
+                    slot_key = "1" if "Cam-01" in jury_slot else ("14" if "Cam-14" in jury_slot else "JURY")
+                    st.session_state.setdefault("stream_overrides", {})[slot_key] = clean_j_url
+                    st.warning(f"Forced binding to {jury_slot}.")
+                    st.rerun()
+
+    active_ov = st.session_state.get("stream_overrides", {})
+    if active_ov:
+        st.markdown("<hr style='margin: 8px 0; border-color: rgba(255,255,255,0.15);'/>", unsafe_allow_html=True)
+        st.caption("Active Overrides:")
+        for k_s, u_s in list(active_ov.items()):
+            st.caption(f"• **Slot {k_s}:** `{u_s[:22]}...`")
+        if st.button("Reset Stream Overrides", key="btn_reset_all_overrides", use_container_width=True):
+            st.session_state.stream_overrides = {}
+            st.rerun()
+
 
 nav_section = st.sidebar.radio(
     "OPERATIONAL MODULES",
@@ -1923,7 +2038,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: #15803D;">● 30 FPS</span>
                 </div>
                 """, unsafe_allow_html=True)
-                html_a = f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{cam_a['stream_id']}" style="width:100%;height:270px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(134,239,172,0.9);box-shadow:0 6px 20px rgba(34,197,94,0.12);"></video></body></html>"""
+                html_a = f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(cam_a)}" style="width:100%;height:270px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(134,239,172,0.9);box-shadow:0 6px 20px rgba(34,197,94,0.12);"></video></body></html>"""
                 st.components.v1.html(html_a, height=280)
 
             if i + 1 < len(VERIFIED_WORKING_CAMERAS):
@@ -1936,7 +2051,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                         <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: #0369A1;">● 30 FPS</span>
                     </div>
                     """, unsafe_allow_html=True)
-                    html_b = f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{cam_b['stream_id']}" style="width:100%;height:270px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(186,230,253,0.9);box-shadow:0 6px 20px rgba(14,165,233,0.12);"></video></body></html>"""
+                    html_b = f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(cam_b)}" style="width:100%;height:270px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(186,230,253,0.9);box-shadow:0 6px 20px rgba(14,165,233,0.12);"></video></body></html>"""
                     st.components.v1.html(html_b, height=280)
 
     elif cctv_mode == "1. Single Camera Stream & Optical HUD Filters":
@@ -1969,7 +2084,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         }
         active_video_filter = filter_css_map.get(filter_mode, filter_css_map["Standard HD (Optimized)"])
         st_num = selected_cam["stream_id"]
-        stream_mp4_url = f"https://live.corp8.cloud/stream/{st_num}"
+        stream_mp4_url = get_active_stream_url(st_num)
 
         st.markdown(f"""
         <div class="kpi-card kpi-card-green" style="min-height: 60px !important; height: 60px !important; display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 14px !important; padding: 12px 20px !important; margin-bottom: 16px !important;">
@@ -2068,7 +2183,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A;">01 Chiman bhai Bridge (Ahmedabad)</span>
             </div>
             """, unsafe_allow_html=True)
-            dual_cam1_html = """<!DOCTYPE html><html><body style="background: transparent; margin: 0; overflow: hidden;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/1" style="width: 100%; height: 320px; object-fit: contain; image-rendering: crisp-edges; filter: contrast(120%) brightness(95%); border-radius: 14px; border: 1px solid rgba(134, 239, 172, 0.8); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.12);"></video></body></html>"""
+            dual_cam1_html = """<!DOCTYPE html><html><body style="background: transparent; margin: 0; overflow: hidden;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('1')}" style="width: 100%; height: 320px; object-fit: contain; image-rendering: crisp-edges; filter: contrast(120%) brightness(95%); border-radius: 14px; border: 1px solid rgba(134, 239, 172, 0.8); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.12);"></video></body></html>"""
             st.components.v1.html(dual_cam1_html, height=330)
 
         with d_col2:
@@ -2078,7 +2193,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A;">14 Delight Junction (Vadodara)</span>
             </div>
             """, unsafe_allow_html=True)
-            dual_cam14_html = """<!DOCTYPE html><html><body style="background: transparent; margin: 0; overflow: hidden;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/14" style="width: 100%; height: 320px; object-fit: contain; image-rendering: crisp-edges; filter: contrast(120%) brightness(95%); border-radius: 14px; border: 1px solid rgba(186, 230, 253, 0.8); box-shadow: 0 6px 20px rgba(14, 165, 233, 0.12);"></video></body></html>"""
+            dual_cam14_html = """<!DOCTYPE html><html><body style="background: transparent; margin: 0; overflow: hidden;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width: 100%; height: 320px; object-fit: contain; image-rendering: crisp-edges; filter: contrast(120%) brightness(95%); border-radius: 14px; border: 1px solid rgba(186, 230, 253, 0.8); box-shadow: 0 6px 20px rgba(14, 165, 233, 0.12);"></video></body></html>"""
             st.components.v1.html(dual_cam14_html, height=330)
 
         dt1, dt2, dt3, dt4 = st.columns(4)
@@ -2152,7 +2267,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     <span style="font-weight: 800; font-size: 0.85rem; color: #0F172A; margin-left: 8px;">{c_main['name']} ({c_main['city']})</span>
                 </div>
                 """, unsafe_allow_html=True)
-                master_vid_html = f"""<!DOCTYPE html><html><body style="background:transparent;margin:0;overflow:hidden;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{c_main['stream_id']}" style="width:100%;height:460px;object-fit:cover;border-radius:16px;border:1.5px solid rgba(134,239,172,0.9);box-shadow:0 8px 28px rgba(34,197,94,0.16);"></video></body></html>"""
+                master_vid_html = f"""<!DOCTYPE html><html><body style="background:transparent;margin:0;overflow:hidden;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c_main)}" style="width:100%;height:460px;object-fit:cover;border-radius:16px;border:1.5px solid rgba(134,239,172,0.9);box-shadow:0 8px 28px rgba(34,197,94,0.16);"></video></body></html>"""
                 st.components.v1.html(master_vid_html, height=470)
 
             with m_right:
@@ -2160,42 +2275,42 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 with r1_1:
                     c2 = cams_selected[1]
                     st.caption(f"**{c2['cam_id']}**: {c2['name'][:18]}")
-                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{c2['stream_id']}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=210)
+                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c2)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=210)
                 with r1_2:
                     c3 = cams_selected[2]
                     st.caption(f"**{c3['cam_id']}**: {c3['name'][:18]}")
-                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{c3['stream_id']}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(253,186,116,0.8);"></video></body></html>""", height=210)
+                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c3)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(253,186,116,0.8);"></video></body></html>""", height=210)
 
                 r2_1, r2_2 = st.columns(2)
                 with r2_1:
                     c4 = cams_selected[3]
                     st.caption(f"**{c4['cam_id']}**: {c4['name'][:18]}")
-                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{c4['stream_id']}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(254,202,202,0.8);"></video></body></html>""", height=210)
+                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c4)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(254,202,202,0.8);"></video></body></html>""", height=210)
                 with r2_2:
                     c5 = cams_selected[4]
                     st.caption(f"**{c5['cam_id']}**: {c5['name'][:18]}")
-                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{c5['stream_id']}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=210)
+                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c5)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=210)
         
         else:
             g1, g2, g3 = st.columns(3)
             with g1:
                 c1 = cams_selected[0]; st.markdown(f"**{c1['cam_id']} — {c1['name']}**")
-                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{c1['stream_id']}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(134,239,172,0.8);"></video></body></html>""", height=230)
+                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c1)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(134,239,172,0.8);"></video></body></html>""", height=230)
             with g2:
                 c2 = cams_selected[1]; st.markdown(f"**{c2['cam_id']} — {c2['name']}**")
-                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{c2['stream_id']}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=230)
+                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c2)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=230)
             with g3:
                 c3 = cams_selected[2]; st.markdown(f"**{c3['cam_id']} — {c3['name']}**")
-                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{c3['stream_id']}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(253,186,116,0.8);"></video></body></html>""", height=230)
+                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c3)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(253,186,116,0.8);"></video></body></html>""", height=230)
 
             st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
             g4, g5, g6 = st.columns(3)
             with g4:
                 c4 = cams_selected[3]; st.markdown(f"**{c4['cam_id']} — {c4['name']}**")
-                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{c4['stream_id']}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(254,202,202,0.8);"></video></body></html>""", height=230)
+                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c4)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(254,202,202,0.8);"></video></body></html>""", height=230)
             with g5:
                 c5 = cams_selected[4]; st.markdown(f"**{c5['cam_id']} — {c5['name']}**")
-                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/{c5['stream_id']}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=230)
+                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c5)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=230)
             with g6:
                 st.markdown(f"**COMMAND STATUS & TELEMETRY**")
                 st.markdown(f"""
@@ -2238,7 +2353,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             """, unsafe_allow_html=True)
             t14_col1, t14_col2 = st.columns([1.4, 1])
             with t14_col1:
-                st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/14" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(244,63,94,0.8);"></video></body></html>""", height=330)
+                st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(244,63,94,0.8);"></video></body></html>""", height=330)
             with t14_col2:
                 c_rlvd1, c_rlvd2 = st.columns(2)
                 with c_rlvd1: render_metric_card("Signal State", "RED LIGHT", "Zebra Monitoring Active", color="red")
@@ -2263,7 +2378,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             """, unsafe_allow_html=True)
             t1_col1, t1_col2 = st.columns([1.4, 1])
             with t1_col1:
-                st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/1" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(34,197,94,0.8);"></video></body></html>""", height=330)
+                st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('1')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(34,197,94,0.8);"></video></body></html>""", height=330)
             with t1_col2:
                 c_d1, c_d2 = st.columns(2)
                 with c_d1: render_metric_card("Two-Wheelers", "48 / min", "🛵 Bikes & Scooters", color="green")
@@ -2614,7 +2729,7 @@ elif nav_section == "Automated Crash & Accident 108 AI":
 
     with ac_col1:
         st.markdown("""
-        <!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/14" style="width:100%;height:340px;object-fit:cover;border-radius:14px;border:2px solid rgba(244,63,94,0.9);box-shadow:0 8px 25px rgba(225,29,72,0.18);"></video></body></html>
+        <!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width:100%;height:340px;object-fit:cover;border-radius:14px;border:2px solid rgba(244,63,94,0.9);box-shadow:0 8px 25px rgba(225,29,72,0.18);"></video></body></html>
         """, unsafe_allow_html=True)
 
     with ac_col2:
@@ -2653,7 +2768,7 @@ elif nav_section == "Police Drone & Body-Cam Feeds":
         </div>
         """, unsafe_allow_html=True)
 
-        st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/1" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,0.8);"></video></body></html>""", height=330)
+        st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('1')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,0.8);"></video></body></html>""", height=330)
         st.info("● **Altitude:** 65 Meters | **Gimbal:** -45° Pitch | **Battery:** 88% (42 Mins Flight Time)")
 
     with dr_col2:
@@ -2664,7 +2779,7 @@ elif nav_section == "Police Drone & Body-Cam Feeds":
         </div>
         """, unsafe_allow_html=True)
 
-        st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/14" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1px solid rgba(14,165,233,0.8);"></video></body></html>""", height=330)
+        st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1px solid rgba(14,165,233,0.8);"></video></body></html>""", height=330)
         st.info("● **Officer:** HC R. Patel (Badge #8812) | **GPS:** 22.3000, 73.1800 | **Network:** 5G Police VPN")
 
 # ----------------- MODULE: PREDICTIVE CRIME HOTSPOT AI MAP -----------------
