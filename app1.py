@@ -1313,7 +1313,7 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
     try:
         st.html(full_html)
     except Exception:
-        st.components.v1.html(full_html, height=height+10)
+        st.html(full_html, height=height+10)
     url = url.strip()
     if not is_domain_resolvable(url, timeout_sec=0.4):
         return False
@@ -1347,8 +1347,6 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
     stream_id = cam_obj["stream_id"]
     stream_url = get_active_stream_url(cam_obj)
-    if not is_domain_resolvable(stream_url, timeout_sec=0.4):
-        return
 
     try:
         yolo_model, ocr_reader = get_ai_models()
@@ -1357,85 +1355,86 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
 
     cap = cv2.VideoCapture(stream_url)
     if not cap.isOpened():
+        cap.release()
         return
 
     last_sample_time = 0
     track_counter = 0
 
-    while not stop_event.is_set():
-        grabbed = cap.grab()
-        if not grabbed:
-            time.sleep(0.08)
-            continue
+    try:
+        while not stop_event.is_set():
+            ret, frame = cap.read()
+            if not ret or frame is None or frame.size == 0:
+                cap.release()
+                break
 
-        now = time.time()
-        if now - last_sample_time < sample_interval:
+            now = time.time()
+            if now - last_sample_time < sample_interval:
+                time.sleep(0.01)
+                continue
+
+            last_sample_time = now
+            fh, fw = frame.shape[:2]
+
+            try:
+                with YOLO_INFERENCE_LOCK:
+                    res = yolo_model(frame, verbose=False, imgsz=256, conf=0.35)
+                    
+                for r in res:
+                    for box in r.boxes:
+                        cls = int(box.cls[0])
+                        if cls in [2, 3, 5, 7]:
+                            x1, y1, x2, y2 = map(int, box.xyxy[0])
+                            vh, vw = y2 - y1, x2 - x1
+                            if vh > 35 and vw > 35:
+                                x1_c, y1_c = max(0, x1), max(0, y1)
+                                x2_c, y2_c = min(fw, x2), min(fh, y2)
+                                v_crop = frame[y1_c:y2_c, x1_c:x2_c]
+                                
+                                ocr_hits = run_strict_ocr_on_crop(ocr_reader, v_crop)
+                                if ocr_hits:
+                                    top_p, top_c, _ = ocr_hits[0]
+                                    formatted_plate = format_dynamic_plate(top_p)
+                                    cur_time_str = time.strftime('%H:%M:%S')
+
+                                    egujcop_match = lookup_egujcop_record(top_p)
+                                    egujcop_tag = f"CRITICAL eGujCop HIT: {egujcop_match['fir_no']} ({egujcop_match['offence']})" if egujcop_match else "Clear (No Active CCTNS Warrant)"
+
+                                    track_counter += 1
+                                    event_payload = {
+                                        "Event ID": f"DAEMON-{cam_obj['cam_id']}-{track_counter:03d}",
+                                        "Entry Time": cur_time_str,
+                                        "Exit Time": cur_time_str,
+                                        "Peak Clarity Time": cur_time_str,
+                                        "Duration": "1.8s (Live Stream)",
+                                        "Vehicle Type": CLASS_NAMES.get(cls, "Vehicle"),
+                                        "Event Type": "LIVE STREAM SIGHTING",
+                                        "Consensus Plate / Details": f"License Plate: [{formatted_plate}]",
+                                        "Match Confidence": f"{round(top_c * 100, 1)}%",
+                                        "Checkpost Location": f"{cam_obj['cam_id']}: {cam_obj['name']} ({cam_obj['city']})",
+                                        "City": cam_obj['city'],
+                                        "Lat": cam_obj['lat'],
+                                        "Lon": cam_obj['lon'],
+                                        "Plate_Clean": clean_str(top_p),
+                                        "eGujCop Status": egujcop_tag,
+                                        "Source": f"Background Daemon ({cam_obj['cam_id']})"
+                                    }
+
+                                    with GLOBAL_SIGHTINGS_LOCK:
+                                        is_duplicate = False
+                                        for prev_s in GLOBAL_SIGHTINGS_BUFFER[-12:]:
+                                            if prev_s.get("Plate_Clean") == clean_str(top_p) and prev_s.get("Checkpost Location") == event_payload["Checkpost Location"]:
+                                                is_duplicate = True
+                                                break
+                                        if not is_duplicate:
+                                            GLOBAL_SIGHTINGS_BUFFER.append(event_payload)
+            except Exception:
+                pass
+
             time.sleep(0.01)
-            continue
-
-        ret, frame = cap.retrieve()
-        if not ret or frame is None or frame.size == 0:
-            continue
-
-        last_sample_time = now
-        fh, fw = frame.shape[:2]
-
-        try:
-            with YOLO_INFERENCE_LOCK:
-                res = yolo_model(frame, verbose=False, imgsz=256, conf=0.35)
-                
-            for r in res:
-                for box in r.boxes:
-                    cls = int(box.cls[0])
-                    if cls in [2, 3, 5, 7]:
-                        x1, y1, x2, y2 = map(int, box.xyxy[0])
-                        vh, vw = y2 - y1, x2 - x1
-                        if vh > 40 and vw > 40:
-                            v_crop = frame[max(0, y1):min(fh, y2), max(0, x1):min(fw, x2)]
-                            ocr_hits = run_strict_ocr_on_crop(ocr_reader, v_crop)
-
-                            if ocr_hits:
-                                top_p, top_c, _ = ocr_hits[0]
-                                formatted_plate = format_dynamic_plate(top_p)
-                                cur_time_str = time.strftime("%H:%M:%S")
-
-                                egujcop_match = lookup_egujcop_record(top_p)
-                                egujcop_tag = f"CRITICAL eGujCop HIT: {egujcop_match['fir_no']} ({egujcop_match['offence']})" if egujcop_match else "Clear (No Active CCTNS Warrant)"
-
-                                track_counter += 1
-                                event_payload = {
-                                    "Event ID": f"DAEMON-{cam_obj['cam_id']}-{track_counter:03d}",
-                                    "Entry Time": cur_time_str,
-                                    "Exit Time": cur_time_str,
-                                    "Peak Clarity Time": cur_time_str,
-                                    "Duration": "1.8s (Live Stream)",
-                                    "Vehicle Type": CLASS_NAMES.get(cls, "Vehicle"),
-                                    "Event Type": "LIVE STREAM SIGHTING",
-                                    "Consensus Plate / Details": f"License Plate: [{formatted_plate}]",
-                                    "Match Confidence": f"{round(top_c * 100, 1)}%",
-                                    "Checkpost Location": f"{cam_obj['cam_id']}: {cam_obj['name']} ({cam_obj['city']})",
-                                    "City": cam_obj['city'],
-                                    "Lat": cam_obj['lat'],
-                                    "Lon": cam_obj['lon'],
-                                    "Plate_Clean": clean_str(top_p),
-                                    "eGujCop Status": egujcop_tag,
-                                    "Source": f"Background Daemon ({cam_obj['cam_id']})"
-                                }
-
-                                with GLOBAL_SIGHTINGS_LOCK:
-                                    is_duplicate = False
-                                    for prev_s in GLOBAL_SIGHTINGS_BUFFER[-12:]:
-                                        if prev_s.get("Plate_Clean") == clean_str(top_p) and prev_s.get("Checkpost Location") == event_payload["Checkpost Location"]:
-                                            is_duplicate = True
-                                            break
-                                    if not is_duplicate:
-                                        GLOBAL_SIGHTINGS_BUFFER.append(event_payload)
-        except Exception:
-            pass
-
-        time.sleep(0.01)
-
-    cap.release()
+    finally:
+        if cap is not None and cap.isOpened():
+            cap.release()
 
 MAX_CONCURRENT_DAEMONS = 2
 
@@ -1547,7 +1546,7 @@ def trigger_audio_sos():
         <source src="https://www.soundjay.com/buttons/sounds/beep-01a.mp3" type="audio/mpeg">
     </audio>
     """
-    st.components.v1.html(audio_html, height=0)
+    st.html(audio_html)
 
 def trigger_voice_dispatch(text_msg, lang="hi-IN"):
     voice_js = f"""
@@ -1562,7 +1561,7 @@ def trigger_voice_dispatch(text_msg, lang="hi-IN"):
         }}
     </script>
     """
-    st.components.v1.html(voice_js, height=0)
+    st.html(voice_js)
 
 def generate_whatsapp_dispatch_link(plate, cam_name, lat, lon, phone="916456287866"):
     t_now = time.strftime('%Y-%m-%d %H:%M:%S')
@@ -2175,7 +2174,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 </div>
                 """, unsafe_allow_html=True)
                 html_a = f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(cam_a)}" style="width:100%;height:270px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(134,239,172,0.9);box-shadow:0 6px 20px rgba(34,197,94,0.12);"></video></body></html>"""
-                st.components.v1.html(html_a, height=280)
+                st.html(html_a)
 
             if i + 1 < len(VERIFIED_WORKING_CAMERAS):
                 cam_b = VERIFIED_WORKING_CAMERAS[i+1]
@@ -2188,7 +2187,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     </div>
                     """, unsafe_allow_html=True)
                     html_b = f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(cam_b)}" style="width:100%;height:270px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(186,230,253,0.9);box-shadow:0 6px 20px rgba(14,165,233,0.12);"></video></body></html>"""
-                    st.components.v1.html(html_b, height=280)
+                    st.html(html_b)
 
     elif cctv_mode == "1. Single Camera Stream & Optical HUD Filters":
         f_col1, f_col2, f_col3 = st.columns([1.5, 1, 1])
@@ -2269,7 +2268,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         </body>
         </html>
         """
-        st.components.v1.html(interactive_player_html, height=520)
+        st.html(interactive_player_html)
 
         c_radar_in, c_radar_act = st.columns([2, 1])
         with c_radar_in:
@@ -2320,7 +2319,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             </div>
             """, unsafe_allow_html=True)
             dual_cam1_html = """<!DOCTYPE html><html><body style="background: transparent; margin: 0; overflow: hidden;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('1')}" style="width: 100%; height: 320px; object-fit: contain; image-rendering: crisp-edges; filter: contrast(120%) brightness(95%); border-radius: 14px; border: 1px solid rgba(134, 239, 172, 0.8); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.12);"></video></body></html>"""
-            st.components.v1.html(dual_cam1_html, height=330)
+            st.html(dual_cam1_html)
 
         with d_col2:
             st.markdown("""
@@ -2330,7 +2329,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             </div>
             """, unsafe_allow_html=True)
             dual_cam14_html = """<!DOCTYPE html><html><body style="background: transparent; margin: 0; overflow: hidden;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width: 100%; height: 320px; object-fit: contain; image-rendering: crisp-edges; filter: contrast(120%) brightness(95%); border-radius: 14px; border: 1px solid rgba(186, 230, 253, 0.8); box-shadow: 0 6px 20px rgba(14, 165, 233, 0.12);"></video></body></html>"""
-            st.components.v1.html(dual_cam14_html, height=330)
+            st.html(dual_cam14_html)
 
         dt1, dt2, dt3, dt4 = st.columns(4)
         with dt1: render_metric_card("Cam 01 Density", "42 Vehicles/Min", "🟢 Free Flow (AMTS Lane Clear)", color="green")
@@ -2404,49 +2403,49 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 </div>
                 """, unsafe_allow_html=True)
                 master_vid_html = f"""<!DOCTYPE html><html><body style="background:transparent;margin:0;overflow:hidden;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c_main)}" style="width:100%;height:460px;object-fit:cover;border-radius:16px;border:1.5px solid rgba(134,239,172,0.9);box-shadow:0 8px 28px rgba(34,197,94,0.16);"></video></body></html>"""
-                st.components.v1.html(master_vid_html, height=470)
+                st.html(master_vid_html)
 
             with m_right:
                 r1_1, r1_2 = st.columns(2)
                 with r1_1:
                     c2 = cams_selected[1]
                     st.caption(f"**{c2['cam_id']}**: {c2['name'][:18]}")
-                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c2)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=210)
+                    st.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c2)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=210)
                 with r1_2:
                     c3 = cams_selected[2]
                     st.caption(f"**{c3['cam_id']}**: {c3['name'][:18]}")
-                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c3)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(253,186,116,0.8);"></video></body></html>""", height=210)
+                    st.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c3)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(253,186,116,0.8);"></video></body></html>""", height=210)
 
                 r2_1, r2_2 = st.columns(2)
                 with r2_1:
                     c4 = cams_selected[3]
                     st.caption(f"**{c4['cam_id']}**: {c4['name'][:18]}")
-                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c4)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(254,202,202,0.8);"></video></body></html>""", height=210)
+                    st.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c4)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(254,202,202,0.8);"></video></body></html>""", height=210)
                 with r2_2:
                     c5 = cams_selected[4]
                     st.caption(f"**{c5['cam_id']}**: {c5['name'][:18]}")
-                    st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c5)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=210)
+                    st.html(f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c5)}" style="width:100%;height:200px;object-fit:cover;border-radius:12px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=210)
         
         else:
             g1, g2, g3 = st.columns(3)
             with g1:
                 c1 = cams_selected[0]; st.markdown(f"**{c1['cam_id']} — {c1['name']}**")
-                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c1)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(134,239,172,0.8);"></video></body></html>""", height=230)
+                st.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c1)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(134,239,172,0.8);"></video></body></html>""", height=230)
             with g2:
                 c2 = cams_selected[1]; st.markdown(f"**{c2['cam_id']} — {c2['name']}**")
-                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c2)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=230)
+                st.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c2)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=230)
             with g3:
                 c3 = cams_selected[2]; st.markdown(f"**{c3['cam_id']} — {c3['name']}**")
-                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c3)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(253,186,116,0.8);"></video></body></html>""", height=230)
+                st.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c3)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(253,186,116,0.8);"></video></body></html>""", height=230)
 
             st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
             g4, g5, g6 = st.columns(3)
             with g4:
                 c4 = cams_selected[3]; st.markdown(f"**{c4['cam_id']} — {c4['name']}**")
-                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c4)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(254,202,202,0.8);"></video></body></html>""", height=230)
+                st.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c4)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(254,202,202,0.8);"></video></body></html>""", height=230)
             with g5:
                 c5 = cams_selected[4]; st.markdown(f"**{c5['cam_id']} — {c5['name']}**")
-                st.components.v1.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c5)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=230)
+                st.html(f"""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c5)}" style="width:100%;height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(186,230,253,0.8);"></video></body></html>""", height=230)
             with g6:
                 st.markdown(f"**COMMAND STATUS & TELEMETRY**")
                 st.markdown(f"""
@@ -2489,7 +2488,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             """, unsafe_allow_html=True)
             t14_col1, t14_col2 = st.columns([1.4, 1])
             with t14_col1:
-                st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(244,63,94,0.8);"></video></body></html>""", height=330)
+                st.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(244,63,94,0.8);"></video></body></html>""", height=330)
             with t14_col2:
                 c_rlvd1, c_rlvd2 = st.columns(2)
                 with c_rlvd1: render_metric_card("Signal State", "RED LIGHT", "Zebra Monitoring Active", color="red")
@@ -2514,7 +2513,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             """, unsafe_allow_html=True)
             t1_col1, t1_col2 = st.columns([1.4, 1])
             with t1_col1:
-                st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('1')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(34,197,94,0.8);"></video></body></html>""", height=330)
+                st.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('1')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(34,197,94,0.8);"></video></body></html>""", height=330)
             with t1_col2:
                 c_d1, c_d2 = st.columns(2)
                 with c_d1: render_metric_card("Two-Wheelers", "48 / min", "🛵 Bikes & Scooters", color="green")
@@ -2536,7 +2535,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             """, unsafe_allow_html=True)
             t15_col1, t15_col2 = st.columns([1.4, 1])
             with t15_col1:
-                st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/15" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(249,115,22,0.8);"></video></body></html>""", height=330)
+                st.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/15" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(249,115,22,0.8);"></video></body></html>""", height=330)
             with t15_col2:
                 tgt_p15 = st.text_input("Enter Stolen / Blacklisted Plate for Checkpost Alert", value="GJ03 HK 9921", key="c15_tgt")
                 if st.button("RUN LIVE CHECKPOST INTERCEPT RADAR", type="primary", use_container_width=True, key="btn_c15_int"):
@@ -2559,7 +2558,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             """, unsafe_allow_html=True)
             t12_col1, t12_col2 = st.columns([1.4, 1])
             with t12_col1:
-                st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/12" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(2,132,199,0.8);"></video></body></html>""", height=330)
+                st.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/12" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(2,132,199,0.8);"></video></body></html>""", height=330)
             with t12_col2:
                 st.info("● **RJ 14 CC 4412** (Jaipur) — Passed Lane 2 @ 21:02:14\n\n● **MH 04 ER 8820** (Thane) — Passed Lane 4 @ 21:03:40\n\n● **DL 3C AA 9911** (Delhi) — Passed Lane 1 @ 21:05:11")
                 render_metric_card("Interstate Ratio", "24.2%", "Out-of-State Vehicles", color="blue")
@@ -2577,7 +2576,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             """, unsafe_allow_html=True)
             t22_col1, t22_col2 = st.columns([1.4, 1])
             with t22_col1:
-                st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/22" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(244,63,94,0.8);"></video></body></html>""", height=330)
+                st.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="https://live.corp8.cloud/stream/22" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(244,63,94,0.8);"></video></body></html>""", height=330)
             with t22_col2:
                 b1, b2 = st.columns(2)
                 with b1: render_metric_card("Border Freight", "112 Trucks", "Recorded Past 60 Mins", color="orange")
@@ -2904,7 +2903,7 @@ elif nav_section == "Police Drone & Body-Cam Feeds":
         </div>
         """, unsafe_allow_html=True)
 
-        st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('1')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,0.8);"></video></body></html>""", height=330)
+        st.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('1')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,0.8);"></video></body></html>""", height=330)
         st.info("● **Altitude:** 65 Meters | **Gimbal:** -45° Pitch | **Battery:** 88% (42 Mins Flight Time)")
 
     with dr_col2:
@@ -2915,7 +2914,7 @@ elif nav_section == "Police Drone & Body-Cam Feeds":
         </div>
         """, unsafe_allow_html=True)
 
-        st.components.v1.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1px solid rgba(14,165,233,0.8);"></video></body></html>""", height=330)
+        st.html("""<!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width:100%;height:320px;object-fit:cover;border-radius:14px;border:1px solid rgba(14,165,233,0.8);"></video></body></html>""", height=330)
         st.info("● **Officer:** HC R. Patel (Badge #8812) | **GPS:** 22.3000, 73.1800 | **Network:** 5G Police VPN")
 
 # ----------------- MODULE: PREDICTIVE CRIME HOTSPOT AI MAP -----------------
