@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.zip
+.streamlit/
+temp_watchlist/
+car_crops/
+inspected_crops/
+sample_frames/
+mediamtx_server/
