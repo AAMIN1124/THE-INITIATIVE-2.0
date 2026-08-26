@@ -1,17 +1,30 @@
 import os
 import warnings
+import sys
 
-# Suppress FFmpeg, OpenCV, and Decoder Terminal Spam
+# Completely suppress C-level FFmpeg, OpenCV, and Decoder Terminal Spam
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
 os.environ["AV_LOG_FORCE_NOCOLOR"] = "1"
 os.environ["FFREPORT"] = "quiet"
-os.environ["OPENCV_LOG_LEVEL"] = "OFF"
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|buffer_size;1024000|max_delay;500000|stimeout;2000000"
+os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
+os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|buffer_size;1024000|max_delay;500000|stimeout;1000000"
 warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 import socket
 import tempfile
 import cv2
+
+# Set OpenCV native C++ log level to silent
+try:
+    if hasattr(cv2, 'utils') and hasattr(cv2.utils, 'logging'):
+        cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
+    if hasattr(cv2, 'setLogLevel'):
+        cv2.setLogLevel(0)
+except Exception:
+    pass
 import io
 import time
 import math
@@ -1164,6 +1177,32 @@ def format_exact_pts(sec_val):
         ms = 999
     return f"{m:02d}:{s:02d}.{ms:03d}"
 
+DNS_CACHE = {}
+
+def is_domain_resolvable(url, timeout_sec=0.4):
+    if not url or not isinstance(url, str):
+        return False
+    try:
+        parsed = urllib.parse.urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            return True
+        if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', hostname):
+            return True
+        now = time.time()
+        if hostname in DNS_CACHE:
+            cached_res, exp = DNS_CACHE[hostname]
+            if now < exp:
+                return cached_res
+        
+        socket.setdefaulttimeout(timeout_sec)
+        socket.gethostbyname(hostname)
+        DNS_CACHE[hostname] = (True, now + 120.0)
+        return True
+    except Exception:
+        DNS_CACHE[hostname] = (False, now + 45.0)
+        return False
+
 # ----------------- UNIVERSAL STREAM INGEST & PROBE HELPERS -----------------
 def get_active_stream_url(identifier):
     if isinstance(identifier, dict):
@@ -1180,10 +1219,13 @@ def get_active_stream_url(identifier):
         return overrides["JURY"].strip()
     return f"https://live.corp8.cloud/stream/{st_id}"
 
-def probe_stream_connectivity(url, timeout_sec=2.5):
+def probe_stream_connectivity(url, timeout_sec=2.0):
     if not url or not isinstance(url, str):
         return False
     url = url.strip()
+    if not is_domain_resolvable(url, timeout_sec=0.4):
+        return False
+
     if url.startswith(("http://", "https://", "rtsp://", "rtmp://")):
         try:
             cap_probe = cv2.VideoCapture(url)
@@ -1213,6 +1255,8 @@ def probe_stream_connectivity(url, timeout_sec=2.5):
 def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
     stream_id = cam_obj["stream_id"]
     stream_url = get_active_stream_url(cam_obj)
+    if not is_domain_resolvable(stream_url, timeout_sec=0.4):
+        return
 
     try:
         yolo_model, ocr_reader = get_ai_models()
