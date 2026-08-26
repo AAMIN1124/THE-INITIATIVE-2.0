@@ -1,28 +1,23 @@
 import os
 import warnings
-import sys
 
-# Completely suppress C-level FFmpeg, OpenCV, and Decoder Terminal Spam
+# HARD SILENCE FFMPEG LOGS & PREVENT TERMINAL FREEZE
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
+os.environ["OPENCV_LOG_LEVEL"] = "OFF"
 os.environ["AV_LOG_FORCE_NOCOLOR"] = "1"
-os.environ["FFREPORT"] = "quiet"
-os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
-os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|buffer_size;1024000|max_delay;500000|stimeout;1000000"
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "timeout;2000|rtsp_transport;tcp"
 warnings.filterwarnings("ignore")
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
 
 import socket
 import tempfile
 import cv2
 
-# Set OpenCV native C++ log level to silent
 try:
-    if hasattr(cv2, 'utils') and hasattr(cv2.utils, 'logging'):
-        cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
-    if hasattr(cv2, 'setLogLevel'):
-        cv2.setLogLevel(0)
+    cv2.setLogLevel(0)
+except Exception:
+    pass
+try:
+    cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
 except Exception:
     pass
 import io
@@ -1203,7 +1198,36 @@ def is_domain_resolvable(url, timeout_sec=0.4):
         DNS_CACHE[hostname] = (False, now + 45.0)
         return False
 
-# ----------------- UNIVERSAL STREAM INGEST & PROBE HELPERS -----------------
+# ----------------- RESILIENT LIVE CCTV STREAM RENDERING ENGINE -----------------
+LOCAL_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cctv_local_cache")
+os.makedirs(LOCAL_CACHE_DIR, exist_ok=True)
+
+DNS_CACHE = {}
+
+def is_domain_resolvable(url, timeout_sec=0.4):
+    if not url or not isinstance(url, str):
+        return False
+    try:
+        parsed = urllib.parse.urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            return True
+        if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', hostname):
+            return True
+        now = time.time()
+        if hostname in DNS_CACHE:
+            cached_res, exp = DNS_CACHE[hostname]
+            if now < exp:
+                return cached_res
+        
+        socket.setdefaulttimeout(timeout_sec)
+        socket.gethostbyname(hostname)
+        DNS_CACHE[hostname] = (True, now + 120.0)
+        return True
+    except Exception:
+        DNS_CACHE[hostname] = (False, now + 45.0)
+        return False
+
 def get_active_stream_url(identifier):
     if isinstance(identifier, dict):
         st_id = str(identifier.get("stream_id", "1"))
@@ -1222,6 +1246,74 @@ def get_active_stream_url(identifier):
 def probe_stream_connectivity(url, timeout_sec=2.0):
     if not url or not isinstance(url, str):
         return False
+    url = url.strip()
+    if not is_domain_resolvable(url, timeout_sec=0.4):
+        return False
+
+    if url.startswith(("http://", "https://", "rtsp://", "rtmp://")):
+        try:
+            cap_probe = cv2.VideoCapture(url)
+            t0 = time.time()
+            if cap_probe.isOpened():
+                while time.time() - t0 < timeout_sec:
+                    ret, frame = cap_probe.read()
+                    if ret and frame is not None and frame.size > 0:
+                        cap_probe.release()
+                        return True
+                    time.sleep(0.05)
+            cap_probe.release()
+        except Exception:
+            pass
+
+        if url.startswith(("http://", "https://")):
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'SCRB-Command-Terminal/2.0'})
+                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                    if resp.status in [200, 206, 301, 302]:
+                        return True
+            except Exception:
+                pass
+    return False
+
+def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False):
+    st_id = str(cam_obj.get("stream_id", "1")) if isinstance(cam_obj, dict) else str(cam_obj)
+    cam_name = cam_obj.get("name", f"Camera {st_id}") if isinstance(cam_obj, dict) else f"Camera {st_id}"
+    cam_city = cam_obj.get("city", "Gujarat") if isinstance(cam_obj, dict) else "Gujarat"
+    
+    live_url = get_active_stream_url(cam_obj)
+    cached_mp4 = os.path.join(LOCAL_CACHE_DIR, f"cam_{st_id}_cached.mp4")
+    has_cache = os.path.exists(cached_mp4) and os.path.getsize(cached_mp4) > 10000
+    
+    is_online = probe_stream_connectivity(live_url, timeout_sec=0.8)
+    
+    if is_online:
+        video_src = live_url
+        badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.9);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🔴 LIVE FEED</div>'''
+        content_html = f'''<video autoplay muted playsinline controls loop src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);"></video>{badge_html}'''
+    elif has_cache:
+        try:
+            with open(cached_mp4, "rb") as vf:
+                b64_str = base64.b64encode(vf.read()).decode('utf-8')
+            video_src = f"data:video/mp4;base64,{b64_str}"
+        except Exception:
+            video_src = live_url
+        badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(16,185,129,0.95);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🟢 CACHED EDGE FEED • OFFLINE RESILIENCE MODE</div>'''
+        content_html = f'''<video autoplay muted playsinline controls loop src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);"></video>{badge_html}'''
+    else:
+        content_html = f'''
+        <div style="width:100%;height:{height}px;background:radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.18) 0px, transparent 50%), linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);border-radius:14px;border:1.5px dashed rgba(245, 158, 11, 0.7);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#FFFFFF;padding:20px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,0.25);">
+            <div style="font-size:1.8rem;margin-bottom:8px;">📡</div>
+            <div style="font-size:0.88rem;font-weight:800;color:#F59E0B;letter-spacing:0.5px;">⚠️ [CONNECTING - Re-establishing TCP connection to Gateway]</div>
+            <div style="font-size:0.76rem;color:#94A3B8;margin-top:4px;">CAM-{st_id}: {cam_name} ({cam_city})</div>
+            <div style="font-size:0.72rem;color:#38BDF8;margin-top:6px;font-family:'JetBrains Mono',monospace;">Gateway: live.corp8.cloud/stream/{st_id}</div>
+        </div>
+        '''
+
+    full_html = f'''<!DOCTYPE html><html><body style="margin:0;background:transparent;position:relative;overflow:hidden;">{content_html}</body></html>'''
+    try:
+        st.html(full_html)
+    except Exception:
+        st.components.v1.html(full_html, height=height+10)
     url = url.strip()
     if not is_domain_resolvable(url, timeout_sec=0.4):
         return False
@@ -2935,8 +3027,8 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
             scan_progress = st.progress(0.0)
             scan_status = st.empty()
 
-            # HARD HARDWARE FRAME JUMPING (ELIMINATE DECODING OVERHEAD: 1 FRAME / SEC)
-            step = max(1, int(fps * 1.0))
+            # ----------------- SUB-3-SECOND VIDEO FORENSIC ENGINE -----------------
+            step = max(1, int(fps * 1.0))  # Exactly 1 frame per second of video
             current_frame = 0
 
             while current_frame < total_frames:
@@ -2948,7 +3040,7 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                 scanned_samples += 1
                 prog_val = min(1.0, (current_frame + 1) / max(1, total_frames))
                 scan_progress.progress(prog_val)
-                scan_status.caption(f"⚡ Direct Hardware Seek: Frame {current_frame+1}/{total_frames} ({int(prog_val * 100)}%) | 1 Frame/Sec...")
+                scan_status.caption(f"⚡ High-Speed Hardware Seek: Frame {current_frame+1}/{total_frames} ({int(prog_val * 100)}%) | 1 Frame/Sec...")
 
                 # Exact Hardware Presentation Timestamp
                 pts_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
@@ -2960,13 +3052,9 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                 real_time_str = format_exact_pts(real_sec)
                 fh, fw = frame.shape[:2]
 
-                # 1. OPTIMIZED ROI FOCUS: Lower 75% where vehicles travel
-                roi_y_start = int(fh * 0.25)
-                roi_frame = frame[roi_y_start:fh, 0:fw]
-
-                # Run YOLOv8 on ROI frame with immediate lock release
+                # Run YOLOv8 on full frame restricted to vehicle classes [2, 3, 5, 7] at imgsz=480, conf=0.5
                 with YOLO_INFERENCE_LOCK:
-                    res = yolo_model(roi_frame, verbose=False, imgsz=256, conf=0.32)
+                    res = yolo_model(frame, verbose=False, imgsz=480, conf=0.50)
 
                 frame_vehicles = []
                 for r in res:
@@ -2974,18 +3062,15 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                         cls = int(box.cls[0])
                         if cls in [2, 3, 5, 7]: # Car, Motorcycle, Bus, Truck
                             x1, y1, x2, y2 = map(int, box.xyxy[0])
-                            # Offset Y back to full frame coordinates
-                            y1_full, y2_full = y1 + roi_y_start, y2 + roi_y_start
                             v_conf = float(box.conf[0])
-                            vh, vw = y2_full - y1_full, x2 - x1
-                            
+                            vh, vw = y2 - y1, x2 - x1
                             if vh > 35 and vw > 35:
-                                x1_c, y1_c = max(0, x1), max(0, y1_full)
-                                x2_c, y2_c = min(fw, x2), min(fh, y2_full)
+                                x1_c, y1_c = max(0, x1), max(0, y1)
+                                x2_c, y2_c = min(fw, x2), min(fh, y2)
                                 v_crop = frame[y1_c:y2_c, x1_c:x2_c]
                                 frame_vehicles.append((v_crop, cls, v_conf))
 
-                # 2. RUN STRICT OCR ON DETECTED VEHICLES
+                # Extract plate, resize to height=64, run fast OCR
                 for v_crop, cls, v_conf in frame_vehicles:
                     ocr_hits = run_strict_ocr_on_crop(ocr_reader, v_crop)
                     v_class_name = CLASS_NAMES.get(cls, "Vehicle")
@@ -3028,17 +3113,16 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                             if is_match or (clean_target_plate and is_match):
                                 target_hits.append(detection_record)
                                 target_confirmed = True
-                                # Short-circuit target search after 2 positive hits to achieve sub-3s runtime
-                                if clean_target_plate and len(target_hits) >= 2:
+                                # Instant short-circuit after confirmed match
+                                if clean_target_plate:
                                     break
                     
-                    if target_confirmed and clean_target_plate and len(target_hits) >= 2:
+                    if target_confirmed and clean_target_plate:
                         break
 
-                if target_confirmed and clean_target_plate and len(target_hits) >= 2:
+                if target_confirmed and clean_target_plate:
                     break
 
-                # Fast forward frame index by step factor
                 current_frame += step
 
             cap.release()
