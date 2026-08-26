@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 *.mp4
+!fallback_feeds/*.mp4
 *.avi
 *.mov
 *.mkv

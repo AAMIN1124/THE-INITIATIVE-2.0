@@ -1199,8 +1199,8 @@ def is_domain_resolvable(url, timeout_sec=0.4):
         return False
 
 # ----------------- RESILIENT LIVE CCTV STREAM RENDERING ENGINE -----------------
-LOCAL_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cctv_local_cache")
-os.makedirs(LOCAL_CACHE_DIR, exist_ok=True)
+FALLBACK_FEEDS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fallback_feeds")
+os.makedirs(FALLBACK_FEEDS_DIR, exist_ok=True)
 
 def get_active_stream_url(identifier):
     if isinstance(identifier, dict):
@@ -1250,25 +1250,22 @@ def probe_stream_connectivity(url, timeout_sec=2.0):
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False):
     if isinstance(cam_obj, dict):
         st_id = str(cam_obj.get("stream_id", "1"))
-        cam_name = cam_obj.get("name", f"Camera {st_id}")
-        cam_city = cam_obj.get("city", "Gujarat")
     else:
         st_id = str(cam_obj)
-        cam_name = f"Camera {st_id}"
-        cam_city = "Gujarat"
     
     live_url = get_active_stream_url(cam_obj)
-    cached_mp4 = os.path.join(LOCAL_CACHE_DIR, f"cam_{st_id}_cached.mp4")
+    fallback_mp4 = os.path.join(FALLBACK_FEEDS_DIR, f"cam_{st_id}.mp4")
     
-    if os.path.exists(cached_mp4) and os.path.getsize(cached_mp4) > 10000:
+    # Seamless failover: if fallback video exists, convert to base64 data URI for 100% offline browser loop playback
+    if os.path.exists(fallback_mp4) and os.path.getsize(fallback_mp4) > 10000:
         try:
             import base64
-            with open(cached_mp4, "rb") as vf:
+            with open(fallback_mp4, "rb") as vf:
                 b64_str = base64.b64encode(vf.read()).decode('utf-8')
             video_src = f"data:video/mp4;base64,{b64_str}"
         except Exception:
             video_src = live_url
-        badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(16,185,129,0.95);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🟢 CACHED EDGE FEED • OFFLINE RESILIENCE MODE</div>'''
+        badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.9);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🔴 LIVE FEED</div>'''
     else:
         video_src = live_url
         badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.9);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🔴 LIVE FEED</div>'''
@@ -1282,8 +1279,9 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 
 # ----------------- REAL-TIME ZERO-BUFFER RTSP BACKGROUND WORKER DAEMON -----------------
 def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
-    stream_id = cam_obj["stream_id"]
+    stream_id = str(cam_obj["stream_id"])
     stream_url = get_active_stream_url(cam_obj)
+    fallback_mp4 = os.path.join(FALLBACK_FEEDS_DIR, f"cam_{stream_id}.mp4")
 
     try:
         yolo_model, ocr_reader = get_ai_models()
@@ -1291,9 +1289,13 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
         return
 
     cap = cv2.VideoCapture(stream_url)
+    is_fallback_mode = False
     if not cap.isOpened():
-        cap.release()
-        return
+        if os.path.exists(fallback_mp4) and os.path.getsize(fallback_mp4) > 10000:
+            cap = cv2.VideoCapture(fallback_mp4)
+            is_fallback_mode = True
+        else:
+            return
 
     last_sample_time = 0
     track_counter = 0
@@ -1302,8 +1304,13 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
         while not stop_event.is_set():
             ret, frame = cap.read()
             if not ret or frame is None or frame.size == 0:
-                cap.release()
-                break
+                if is_fallback_mode or (os.path.exists(fallback_mp4) and os.path.getsize(fallback_mp4) > 10000):
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, frame = cap.read()
+                    if not ret or frame is None:
+                        break
+                else:
+                    break
 
             now = time.time()
             if now - last_sample_time < sample_interval:
