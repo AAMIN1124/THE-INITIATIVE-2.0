@@ -2,13 +2,13 @@ streamlit
 opencv-python-headless
 ultralytics
 easyocr
+pandas
+psutil
 torch
 torchvision
 reportlab
 folium
 streamlit-folium
-pandas
 numpy
 qrcode
 requests
-psutil
