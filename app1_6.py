@@ -502,7 +502,11 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-    html, body, [class*="css"], .stApp {
+    /* ========================================================================= */
+    /* THEME ISOLATION & IMMUTABLE HIGH-CONTRAST GLOBAL SURFACE                 */
+    /* ========================================================================= */
+    html, body, [class*="css"], .stApp, .stApp[data-theme="dark"], .stApp[data-theme="light"],
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background: radial-gradient(circle at 10% 20%, #F1F5F9 0%, #E2E8F0 45%, #CBD5E1 100%) !important;
         background-attachment: fixed !important;
         color: #0F172A !important;
@@ -510,13 +514,14 @@ st.markdown("""
         letter-spacing: -0.01em;
     }
 
-    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stHeading {
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stHeading,
+    .stApp h1 *, .stApp h2 *, .stApp h3 *, .stApp h4 *, .stApp h5 *, .stApp h6 * {
         color: #0F172A !important;
         font-weight: 800 !important;
         letter-spacing: -0.025em !important;
     }
 
-    .stApp p, .stApp span, .stApp label, .stApp div {
+    .stApp p, .stApp span, .stApp label, .stApp div:not([data-testid="stSidebar"] *) {
         color: #1E293B;
     }
 
@@ -524,6 +529,9 @@ st.markdown("""
         font-family: 'JetBrains Mono', 'SF Mono', 'Roboto Mono', monospace !important;
     }
 
+    /* ========================================================================= */
+    /* IMMUTABLE GLASSMORPHIC KPI & ACTION CARDS                                 */
+    /* ========================================================================= */
     .kpi-card {
         backdrop-filter: blur(28px) saturate(200%) !important;
         -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
@@ -687,7 +695,7 @@ st.markdown("""
         letter-spacing: -0.03em;
     }
 
-    .kpi-subtext {
+    .kpi-subtext, .kpi-subtext * {
         font-size: 0.76rem;
         color: #475569 !important;
         margin-top: 4px;
@@ -696,6 +704,9 @@ st.markdown("""
         gap: 6px;
     }
 
+    /* ========================================================================= */
+    /* SOC COMMAND HEADER                                                        */
+    /* ========================================================================= */
     .soc-header {
         display: flex;
         align-items: center;
@@ -798,6 +809,9 @@ st.markdown("""
         border: 1px solid #D97706 !important;
     }
 
+    /* ========================================================================= */
+    /* ALERT NOTIFICATION BOXES                                                 */
+    /* ========================================================================= */
     .soc-alert-box-red {
         background: radial-gradient(at 0% 0%, rgba(244, 63, 94, 0.2) 0px, transparent 60%),
                     linear-gradient(135deg, rgba(255, 241, 242, 0.8) 0%, rgba(254, 226, 226, 0.6) 100%) !important;
@@ -809,6 +823,7 @@ st.markdown("""
         margin-bottom: 18px !important;
         box-shadow: 0 10px 30px rgba(225, 29, 72, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.9) !important;
     }
+    .soc-alert-box-red * { color: #991B1B !important; }
 
     .soc-alert-box-orange {
         background: radial-gradient(at 0% 0%, rgba(249, 115, 22, 0.2) 0px, transparent 60%),
@@ -821,6 +836,7 @@ st.markdown("""
         margin-bottom: 18px !important;
         box-shadow: 0 10px 30px rgba(249, 115, 22, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.9) !important;
     }
+    .soc-alert-box-orange * { color: #9A3412 !important; }
 
     .soc-alert-box-green {
         background: radial-gradient(at 0% 0%, rgba(34, 197, 94, 0.2) 0px, transparent 60%),
@@ -833,6 +849,7 @@ st.markdown("""
         margin-bottom: 18px !important;
         box-shadow: 0 10px 30px rgba(34, 197, 94, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.9) !important;
     }
+    .soc-alert-box-green * { color: #166534 !important; }
 
     .soc-alert-title {
         font-size: 1.1rem;
@@ -846,6 +863,9 @@ st.markdown("""
         line-height: 1.5;
     }
 
+    /* ========================================================================= */
+    /* NATIVE STREAMLIT COMPONENT THEME ISOLATION (INPUTS, SELECTS, DATAFRAMES)  */
+    /* ========================================================================= */
     div[data-testid="stAlert"] {
         background: radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.18) 0px, transparent 50%),
                     linear-gradient(135deg, rgba(240, 249, 255, 0.75) 0%, rgba(224, 242, 254, 0.55) 100%) !important;
@@ -855,25 +875,42 @@ st.markdown("""
         border-radius: 16px !important;
         box-shadow: 0 6px 20px rgba(14, 165, 233, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
     }
+    div[data-testid="stAlert"] * {
+        color: #0F172A !important;
+    }
 
-    .stTextInput > div > div > input, 
-    .stSelectbox > div > div > div, 
-    .stMultiSelect > div, 
-    textarea {
-        background: rgba(240, 249, 255, 0.65) !important;
+    .stTextInput input, 
+    .stSelectbox div[data-baseweb="select"] *, 
+    .stMultiSelect div[data-baseweb="select"] *,
+    textarea,
+    div[data-baseweb="input"] input {
+        background: rgba(240, 249, 255, 0.75) !important;
         backdrop-filter: blur(20px) saturate(190%) !important;
         -webkit-backdrop-filter: blur(20px) saturate(190%) !important;
         color: #0F172A !important;
+        -webkit-text-fill-color: #0F172A !important;
         border: 1px solid rgba(186, 230, 253, 0.9) !important;
         border-radius: 14px !important;
         font-size: 0.92rem !important;
         box-shadow: 0 4px 16px rgba(14, 165, 233, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
     }
 
-    .stTextInput > div > div > input:focus {
-        background: rgba(240, 249, 255, 0.85) !important;
+    .stTextInput input:focus, textarea:focus {
+        background: rgba(240, 249, 255, 0.95) !important;
         border-color: #0284C7 !important;
         box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+    }
+
+    div[data-baseweb="popover"], div[data-baseweb="popover"] * {
+        background: #FFFFFF !important;
+        color: #0F172A !important;
+    }
+    div[data-baseweb="popover"] li[role="option"] {
+        color: #0F172A !important;
+    }
+    div[data-baseweb="popover"] li[role="option"]:hover {
+        background: #E0F2FE !important;
+        color: #0369A1 !important;
     }
 
     div[data-testid="stFileUploadDropzone"] {
@@ -885,16 +922,21 @@ st.markdown("""
         border-radius: 18px !important;
         box-shadow: 0 8px 25px rgba(14, 165, 233, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
     }
+    div[data-testid="stFileUploadDropzone"] * {
+        color: #0F172A !important;
+    }
 
     div[data-testid="stDataFrame"] {
         border: 1px solid rgba(186, 230, 253, 0.9) !important;
         border-radius: 18px !important;
-        background: radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.12) 0px, transparent 60%),
-                    linear-gradient(135deg, rgba(240, 249, 255, 0.65) 0%, rgba(224, 242, 254, 0.5) 100%) !important;
+        background: rgba(255, 255, 255, 0.85) !important;
         backdrop-filter: blur(24px) saturate(180%) !important;
         -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
         overflow: hidden !important;
         box-shadow: 0 10px 30px rgba(14, 165, 233, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+    }
+    div[data-testid="stDataFrame"] * {
+        color: #0F172A !important;
     }
 
     .login-box {
@@ -910,6 +952,9 @@ st.markdown("""
         border-radius: 22px !important;
         box-shadow: 0 20px 50px rgba(14, 165, 233, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.95) !important;
     }
+    .login-box * {
+        color: #0F172A !important;
+    }
 
     .profile-hero-card {
         background: radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.25) 0px, transparent 55%),
@@ -922,6 +967,9 @@ st.markdown("""
         padding: 26px !important;
         margin-bottom: 20px !important;
         box-shadow: 0 10px 32px rgba(14, 165, 233, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.95) !important;
+    }
+    .profile-hero-card * {
+        color: #0F172A !important;
     }
 
     .stButton > button[kind="primary"], .stButton > button {
@@ -939,6 +987,7 @@ st.markdown("""
 
     .stButton > button * {
         color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
     }
 
     .stButton > button:hover {
@@ -967,15 +1016,19 @@ st.markdown("""
     }
 
     /* ========================================================================= */
-    /* JET BLACK SIDEBAR                                                         */
+    /* JET BLACK SIDEBAR (ISOLATED IMMUTABLE DARK MODE)                           */
     /* ========================================================================= */
-    section[data-testid="stSidebar"] {
+    section[data-testid="stSidebar"],
+    section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
+    section[data-testid="stSidebar"][data-theme="dark"],
+    section[data-testid="stSidebar"][data-theme="light"] {
         background-color: #000000 !important;
         border-right: 1px solid #1E293B !important;
     }
 
     section[data-testid="stSidebar"] * {
         color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
     }
 
     section[data-testid="stSidebar"] h1, 
@@ -990,6 +1043,7 @@ st.markdown("""
         font-size: 1.25rem !important;
         font-weight: 900 !important;
         color: #00E5FF !important;
+        -webkit-text-fill-color: #00E5FF !important;
         margin-top: 2px !important;
         letter-spacing: 1px !important;
         text-shadow: 0 0 14px rgba(0, 229, 255, 0.45) !important;
@@ -1038,6 +1092,7 @@ st.markdown("""
         font-size: 0.88rem !important;
         font-weight: 700 !important;
         color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
@@ -1056,6 +1111,7 @@ st.markdown("""
 
     .sidebar-profile-card * {
         color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
     }
 
     .sidebar-avatar {
