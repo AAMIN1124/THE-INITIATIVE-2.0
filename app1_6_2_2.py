@@ -1572,39 +1572,37 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 </head>
 <body>
 <div class="vid-box">
-    <video id="cctvVid" autoplay muted playsinline controls preload="none" loop oncanplay="this.play();" data-src="{video_src}"></video>
+    <video id="cctvVid" autoplay muted playsinline controls preload="none" loop></video>
     {badge_html}
 </div>
 <script>
     (function() {{
         var vid = document.getElementById('cctvVid');
-        var srcUrl = vid.getAttribute('data-src');
+        var streamUrl = "{video_src}";
         var delay = {stagger_ms};
-        
-        function startStream() {{
-            vid.src = srcUrl;
-            vid.load();
+
+        function detachSocket() {{
+            try {{
+                vid.pause();
+                vid.removeAttribute('src');
+                vid.src = "";
+                vid.load();
+            }} catch(e) {{}}
+        }}
+
+        window.addEventListener('beforeunload', detachSocket);
+        window.addEventListener('unload', detachSocket);
+        window.addEventListener('pagehide', detachSocket);
+
+        setTimeout(function() {{
+            vid.src = streamUrl;
             var p = vid.play();
             if (p !== undefined) {{
                 p.catch(function() {{
-                    setTimeout(function() {{ vid.play(); }}, 250);
+                    setTimeout(function() {{ vid.play().catch(function(){{}}); }}, 200);
                 }});
             }}
-        }}
-
-        if ('IntersectionObserver' in window) {{
-            var obs = new IntersectionObserver(function(entries) {{
-                entries.forEach(function(entry) {{
-                    if (entry.isIntersecting) {{
-                        setTimeout(startStream, delay);
-                        obs.disconnect();
-                    }}
-                }});
-            }}, {{ threshold: 0.1 }});
-            obs.observe(vid);
-        }} else {{
-            setTimeout(startStream, delay);
-        }}
+        }}, delay);
     }})();
 </script>
 </body>
@@ -2569,14 +2567,33 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             <div class="osd-tag osd-tl">{selected_cam['cam_id']} • {selected_cam['name'].upper()}</div>
             <div class="osd-tag osd-tr">● LIVE REC • {selected_cam['city'].upper()}</div>
             <div class="live-badge">🔴 1080P HD STREAM ACTIVE</div>
-            <video id="vidPlayer" autoplay muted playsinline controls preload="metadata" loop oncanplay="this.play();" src="{stream_mp4_url}" style="background:#000;"></video>
+            <video id="vidPlayer" autoplay muted playsinline controls preload="none" loop style="background:#000;"></video>
         </div>
         <script>
             (function() {{
                 var v = document.getElementById('vidPlayer');
-                v.play().catch(function() {{
-                    setTimeout(function() {{ v.play(); }}, 200);
-                }});
+                var streamUrl = "{stream_mp4_url}";
+
+                function cleanSocket() {{
+                    try {{
+                        v.pause();
+                        v.removeAttribute('src');
+                        v.src = "";
+                        v.load();
+                    }} catch(e) {{}}
+                }}
+
+                window.addEventListener('beforeunload', cleanSocket);
+                window.addEventListener('unload', cleanSocket);
+                window.addEventListener('pagehide', cleanSocket);
+
+                v.src = streamUrl;
+                var p = v.play();
+                if (p !== undefined) {{
+                    p.catch(function() {{
+                        setTimeout(function() {{ v.play().catch(function(){{}}); }}, 150);
+                    }});
+                }}
             }})();
         </script>
         </body>
