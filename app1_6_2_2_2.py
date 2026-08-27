@@ -1566,7 +1566,7 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
     
     direct_video_html = f'''
     <div style="position:relative;width:100%;height:{height}px;overflow:hidden;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);background:#000;margin-bottom:12px;">
-        <video autoplay muted playsinline controls loop src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;background:#000;{style_extra}"></video>
+        <video autoplay muted playsinline controls preload="metadata" loop oncanplay="this.play();" onerror="setTimeout(() => {{ try {{ this.load(); this.play().catch(()=>{{}}); }} catch(e){{}} }}, 800);" src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;background:#000;{style_extra}"></video>
         {badge_html}
     </div>
     '''
