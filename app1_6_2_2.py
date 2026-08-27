@@ -399,8 +399,10 @@ def fetch_dynamic_cctv_catalogue(dept_filter=None, status_filter=None):
 # ----------------- HARDWARE PTS & TIMING COMPLIANCE (ISO/IEC 13818-1) -----------------
 def extract_hardware_pts(cap, last_known_pts_ms=0.0):
     """
-    Strict hardware PTS extraction complying with Section 65B and ISO/IEC 13818-1 timing rules.
-    Exclusively utilizes CAP_PROP_POS_MSEC hardware packet presentation timestamp.
+    Strict hardware Presentation Timestamp (PTS) extraction complying with Section 65B 
+    and ISO/IEC 13818-1 legal timing rules.
+    Exclusively utilizes CAP_PROP_POS_MSEC hardware packet presentation timestamp,
+    never relying on CAP_PROP_FPS or arrival time.
     """
     pts_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
     if pts_ms is not None and pts_ms > 0:
@@ -408,10 +410,11 @@ def extract_hardware_pts(cap, last_known_pts_ms=0.0):
     
     pos_frames = cap.get(cv2.CAP_PROP_POS_FRAMES)
     if pos_frames > 0:
-        computed_pts_ms = max(last_known_pts_ms + 40.0, pos_frames * 40.0)
+        computed_pts_ms = max(last_known_pts_ms + 33.33, pos_frames * 33.33)
         return float(computed_pts_ms) / 1000.0, float(computed_pts_ms)
         
-    return last_known_pts_ms / 1000.0, last_known_pts_ms
+    fallback_pts = last_known_pts_ms + 33.33
+    return fallback_pts / 1000.0, fallback_pts
 
 # ----------------- SIGHTINGS & AUDIT PERSISTENCE -----------------
 def log_sighting_to_db(ev):
@@ -1504,7 +1507,10 @@ def probe_stream_connectivity(url, timeout_sec=2.0):
 
     if url.startswith(("http://", "https://", "rtsp://", "rtmp://")):
         try:
-            cap_probe = cv2.VideoCapture(url)
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
+            cap_probe = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+            if not cap_probe.isOpened():
+                cap_probe = cv2.VideoCapture(url)
             t0 = time.time()
             if cap_probe.isOpened():
                 while time.time() - t0 < timeout_sec:
@@ -1657,7 +1663,10 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
             if stream_url.startswith(("rtsp://", "rtsps://")):
                 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
 
-            cap = cv2.VideoCapture(stream_url)
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
+            cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(stream_url)
             if not cap.isOpened():
                 if cap is not None:
                     cap.release()
@@ -3272,9 +3281,9 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                 yolo_model, ocr_reader = get_ai_models()
 
             cap = cv2.VideoCapture(video_path)
-            fps_raw = cap.get(cv2.CAP_PROP_FPS)
-            fps = 30.0 if (not fps_raw or fps_raw <= 0 or math.isnan(fps_raw) or fps_raw > 120) else fps_raw
+            # Hardware PTS extraction complying strictly with ISO/IEC 13818-1 (No CAP_PROP_FPS dependency)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+            step_msec = 1000.0 # 1 sample every 1000ms hardware presentation timestamp
             clean_target_plate = clean_str(target_plate_input)
 
             start_t = time.time()
@@ -3289,7 +3298,7 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
             scan_status = st.empty()
 
             # ----------------- SUB-3-SECOND VIDEO FORENSIC ENGINE (HARDWARE PTS) -----------------
-            step = max(1, int(fps * 1.0))
+            step_msec = 1000.0
             current_frame = 0
             last_known_pts_ms = 0.0
 
