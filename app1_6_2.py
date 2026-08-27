@@ -72,6 +72,7 @@ if "ACTIVE_DAEMON_THREADS" not in globals():
     ACTIVE_DAEMON_THREADS = {}
 if "DAEMON_STOP_EVENTS" not in globals():
     DAEMON_STOP_EVENTS = {}
+MAX_CONCURRENT_DAEMONS = 2
 
 # ----------------- SESSION STATE INITIALIZATION -----------------
 if "authenticated" not in st.session_state:
