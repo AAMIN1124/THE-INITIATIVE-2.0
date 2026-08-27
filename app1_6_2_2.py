@@ -1236,44 +1236,7 @@ GUJARAT_HIGHWAY_CORRIDORS = {
     ]
 }
 
-@st.cache_data(ttl=300)
-def fetch_dynamic_cctv_catalogue():
-    endpoints = ["https://live.corp8.cloud/api/ingest", "http://live.corp8.cloud/api/ingest"]
-    for url in endpoints:
-        try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'SCRB-Command-Terminal/2.0'})
-            with urllib.request.urlopen(req, timeout=1.0) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode('utf-8'))
-                    if isinstance(data, list) and len(data) > 0:
-                        parsed = []
-                        for idx, item in enumerate(data):
-                            st_id = str(item.get("stream_id", item.get("id", idx + 1)))
-                            c_id = item.get("cam_id", f"CAM-{int(st_id):02d}")
-                            name = item.get("name", item.get("location", f"Checkpost Node {st_id}"))
-                            lat = float(item.get("lat", item.get("latitude", 23.0 + (idx * 0.05))))
-                            lon = float(item.get("lon", item.get("longitude", 72.5 + (idx * 0.05))))
-                            city = item.get("city", "Gujarat")
-                            c_type = item.get("type", "4K ANPR PTZ")
-                            dept = item.get("dept", item.get("department", "Traffic Branch"))
-                            status = item.get("status", "ONLINE").upper()
-                            is_ver = st_id in ["1", "2", "4", "7", "12", "14", "15", "22", "26", "27", "28", "29", "30"]
-                            parsed.append({
-                                "stream_id": st_id,
-                                "cam_id": c_id,
-                                "name": name,
-                                "lat": lat,
-                                "lon": lon,
-                                "city": city,
-                                "type": c_type,
-                                "dept": dept,
-                                "status": status,
-                                "verified": is_ver
-                            })
-                        return parsed
-        except Exception:
-            continue
-    return STATIC_CCTV_CATALOGUE
+# Dynamic catalogue initialized from SQLite registry with API/Static fallback
 
 ACTIVE_CCTV_CATALOGUE = fetch_dynamic_cctv_catalogue()
 VERIFIED_WORKING_CAMERAS = [c for c in ACTIVE_CCTV_CATALOGUE if c.get("verified", False)]
@@ -3793,7 +3756,7 @@ elif nav_section == "Statewide CCTV Asset Registry & Gap Analysis":
     with g_col2:
         sel_sla = st.selectbox("Filter by Maintenance Contract / SLA Status", ["All Statuses", "Active", "Due in 15 Days", "Expired"])
 
-    cctv_registry_records = fetch_department_registry_from_db(sel_dept, sel_sla)
+    cctv_registry_records = fetch_dynamic_cctv_catalogue(sel_dept, sel_sla)
 
     # Metric calculations
     total_assets = len(cctv_registry_records)
