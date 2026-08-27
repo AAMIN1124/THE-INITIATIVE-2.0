@@ -212,6 +212,49 @@ def init_db():
             ]
             cur.executemany("INSERT INTO egujcop_watchlist (plate_clean, plate_formatted, fir_no, police_station, offence, sections, status, priority, owner_vahan, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", seed_wl)
 
+        # Auto-seed cctv_department_registry with all 30 statewide cameras if empty
+        cur.execute("SELECT COUNT(*) FROM cctv_department_registry")
+        if cur.fetchone()[0] == 0:
+            seed_cams = [
+                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-01", "01 Chiman bhai Bridge", "Ahmedabad", "Ahmedabad", 23.0450, 72.5710, "4K ANPR PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/1", "", "ONLINE"),
+                ("SCRB Highway", "Gujarat Police (SCRB Highway)", "CAM-02", "02 Janpath", "Ahmedabad", "Ahmedabad", 23.0300, 72.5600, "High-Mast Bullet", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/2", "", "ONLINE"),
+                ("Smart City Mission", "Smart City Mission", "CAM-03", "03 O.N.G.C. Office", "Ahmedabad", "Ahmedabad", 23.0900, 72.5900, "Dome 360", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/3", "", "ONLINE"),
+                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-04", "04 Paldi Circle", "Ahmedabad", "Ahmedabad", 23.0140, 72.5660, "Fixed ANPR Dual", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/4", "", "ONLINE"),
+                ("SCRB Cyber Grid", "Gujarat Police (SCRB Cyber Grid)", "CAM-05", "05 Visat teen Rasta", "Ahmedabad", "Ahmedabad", 23.1050, 72.5950, "4K ANPR PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/5", "", "ONLINE"),
+                ("City Police", "Gujarat Police (City Police)", "CAM-06", "06 Timbavadi gate-Junagadh", "Junagadh", "Junagadh", 21.5120, 70.4480, "Secure Perimeter", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/6", "", "ONLINE"),
+                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-07", "07 hero-showroom-gir-somnath", "Somnath", "Somnath", 20.9100, 70.4100, "Radar Speed Gun", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/7", "", "ONLINE"),
+                ("City Police", "Gujarat Police (City Police)", "CAM-08", "08 majewadi-gate-junagadh", "Junagadh", "Junagadh", 21.5220, 70.4570, "4K ANPR PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/8", "", "ONLINE"),
+                ("Highway Patrol", "Gujarat Police (Highway Patrol)", "CAM-09", "09 new-bypass-circle-junagadh", "Junagadh", "Junagadh", 21.5350, 70.4700, "Toll ANPR Barrier", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/9", "", "ONLINE"),
+                ("City Police", "Gujarat Police (City Police)", "CAM-10", "10 char-chowk-road-junagadh", "Junagadh", "Junagadh", 21.5180, 70.4520, "Bullet Surveillance", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/10", "", "ONLINE"),
+                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-11", "11 dolatpara-junagadh", "Junagadh", "Junagadh", 21.5400, 70.4650, "4K ANPR PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/11", "", "ONLINE"),
+                ("Highway Patrol", "Gujarat Police (Highway Patrol)", "CAM-12", "12 Tri Mandir Adalaj Tollnaka", "Gandhinagar", "Gandhinagar", 23.1600, 72.5800, "High-Mast PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/12", "", "ONLINE"),
+                ("City Police", "Gujarat Police (City Police)", "CAM-13", "13 CN Vidhyalaya", "Ahmedabad", "Ahmedabad", 23.0250, 72.5450, "Airport Security", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/13", "", "ONLINE"),
+                ("Highway Patrol", "Gujarat Police (Highway Patrol)", "CAM-14", "14 Delight Junction", "Vadodara", "Vadodara", 22.3000, 73.1800, "Fixed ANPR Dual", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/14", "", "ONLINE"),
+                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-15", "15 Suvidha park Checkpost", "Rajkot", "Rajkot", 22.2900, 70.7800, "4K ANPR PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/15", "", "ONLINE"),
+                ("City Police", "Gujarat Police (City Police)", "CAM-16", "16 Visat P2 Checkpost", "Ahmedabad", "Ahmedabad", 23.1100, 72.6000, "City Dome Camera", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/16", "", "ONLINE"),
+                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-17", "17 Rajkot Bus Port CCTV", "Rajkot", "Rajkot", 22.3050, 70.8020, "4K ANPR PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/17", "", "ONLINE"),
+                ("City Police", "Gujarat Police (City Police)", "CAM-18", "18 Rajkot City CCTV", "Rajkot", "Rajkot", 22.2800, 70.7900, "Heritage PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/18", "", "ONLINE"),
+                ("Rural Police", "Gujarat Police (Rural Police)", "CAM-19", "19 Khaparia Panchayat, Navsari", "Navsari", "Navsari", 20.7634, 72.9554, "Port Heavy ANPR", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/19", "", "ONLINE"),
+                ("Special Ops Group", "Gujarat Police (Special Ops Group)", "CAM-20", "20 Mohanpura Junction", "Mehsana", "Mehsana", 23.5880, 72.3690, "Border Surveillance", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/20", "", "ONLINE"),
+                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-21", "21 Patan Dethali Char Rasta", "Patan", "Patan", 23.8500, 72.1300, "4K ANPR PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/21", "", "ONLINE"),
+                ("Highway Patrol", "Gujarat Police (Highway Patrol)", "CAM-22", "22 BK Mervada tran Rasta", "Banaskantha", "Banaskantha", 24.1700, 72.4300, "Toll Barrier ANPR", "1080p", 90.0, "North", "Due in 15 Days", "2026-09-15", 90, "https://live.corp8.cloud/stream/22", "", "ONLINE"),
+                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-23", "23 Kheram Checkpost", "Anand", "Anand", 22.5640, 72.9280, "Fixed ANPR Dual", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/23", "", "ONLINE"),
+                ("North Zone Patrol", "Gujarat Police (North Zone Patrol)", "CAM-24", "24 Dehgam Junction", "Gandhinagar", "Gandhinagar", 23.1670, 72.8120, "Highway ANPR", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/24", "", "ONLINE"),
+                ("Marine Police", "Gujarat Coastal Police", "CAM-25", "25 Dhanori Checkpost", "Navsari", "Navsari", 20.9020, 72.9200, "Coastal Radar PTZ", "1080p", 90.0, "North", "Expired", "2026-01-10", 90, "https://live.corp8.cloud/stream/25", "", "ONLINE"),
+                ("SCRB Highway", "Gujarat Police (SCRB Highway)", "CAM-26", "26 Ratanpur Border Checkpost", "Sabarkantha", "Sabarkantha", 23.8500, 73.1200, "4K ANPR PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/26", "", "ONLINE"),
+                ("Marine Police", "Gujarat Coastal Police", "CAM-27", "27 Mandvi Coastal Radar Checkpoint", "Kutch", "Kutch", 22.8300, 69.3500, "Coastal Radar PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/27", "", "ONLINE"),
+                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-28", "28 Chhota Udaipur Transit Barrier", "Chhota Udaipur", "Chhota Udaipur", 22.3080, 74.0150, "Fixed ANPR Dual", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/28", "", "ONLINE"),
+                ("City Police", "Gujarat Police (City Police)", "CAM-29", "29 Morbi Ceramic Highway Node", "Morbi", "Morbi", 22.8120, 70.8350, "High-Mast Bullet", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/29", "", "ONLINE"),
+                ("State Security", "Gujarat Home Department (State Security)", "CAM-30", "30 Somnath Temple Perimeter", "Somnath", "Somnath", 20.8880, 70.4010, "Dome 360", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/30", "", "ONLINE")
+            ]
+            cur.executemany("""
+            INSERT INTO cctv_department_registry (
+                dept_code, dept_name, camera_id, location_name, district, city, lat, lon,
+                camera_type, resolution, fov_deg, direction, sla_status, sla_expiry_date,
+                retention_days, stream_primary, stream_fallback, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, seed_cams)
+
         conn.commit()
         conn.close()
     except Exception:
@@ -1539,12 +1582,18 @@ import streamlit.components.v1 as components
 
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False):
     if isinstance(cam_obj, dict):
-        st_id = str(cam_obj.get("stream_id", "1"))
+        cam_dict = cam_obj
+        st_id = str(cam_dict.get("stream_id", "1"))
     else:
-        st_id = str(cam_obj)
+        st_id = str(cam_obj).strip()
+        cam_dict = next(
+            (c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) == st_id or str(c.get("cam_id")) == st_id),
+            {"stream_id": st_id, "cam_id": f"CAM-{int(st_id):02d}" if st_id.isdigit() else st_id, "name": f"Camera {st_id}", "city": "Gujarat", "dept": "Traffic Branch", "status": "ONLINE"}
+        )
     
-    video_src = get_active_stream_url(cam_obj)
-    badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.9);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🔴 LIVE FEED</div>'''
+    video_src = get_active_stream_url(cam_dict)
+    cam_id_tag = cam_dict.get("cam_id", f"CAM-{st_id}")
+    badge_html = f'''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;">🔴 LIVE • {cam_id_tag}</div>'''
 
     style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
     full_html = f'''<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{{box-sizing:border-box;margin:0;padding:0;}}body{{background:transparent;overflow:hidden;}}</style></head><body><div style="position:relative;width:100%;height:{height}px;overflow:hidden;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);background:#000;"><video autoplay muted playsinline controls preload="auto" loop onloadedmetadata="this.play();" src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;background:#000;{style_extra}"></video>{badge_html}</div></body></html>'''
@@ -3744,7 +3793,7 @@ elif nav_section == "Statewide CCTV Asset Registry & Gap Analysis":
     with g_col2:
         sel_sla = st.selectbox("Filter by Maintenance Contract / SLA Status", ["All Statuses", "Active", "Due in 15 Days", "Expired"])
 
-    cctv_registry_records = fetch_dynamic_cctv_catalogue(sel_dept, sel_sla)
+    cctv_registry_records = fetch_department_registry_from_db(sel_dept, sel_sla)
 
     # Metric calculations
     total_assets = len(cctv_registry_records)
