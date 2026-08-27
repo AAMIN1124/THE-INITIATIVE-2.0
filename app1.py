@@ -218,7 +218,7 @@ def init_db():
         cur.execute("SELECT COUNT(*) FROM cctv_department_registry")
         if cur.fetchone()[0] == 0:
             seed_cams = [
-                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-01", "01 Chiman bhai Bridge", "Ahmedabad", "Ahmedabad", 23.0450, 72.5710, "4K ANPR PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/14", "", "ONLINE"),
+                ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-01", "01 Chiman bhai Bridge", "Ahmedabad", "Ahmedabad", 23.0450, 72.5710, "4K ANPR PTZ", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/1", "", "ONLINE"),
                 ("SCRB Highway", "Gujarat Police (SCRB Highway)", "CAM-02", "02 Janpath", "Ahmedabad", "Ahmedabad", 23.0300, 72.5600, "High-Mast Bullet", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/2", "", "ONLINE"),
                 ("Smart City Mission", "Smart City Mission", "CAM-03", "03 O.N.G.C. Office", "Ahmedabad", "Ahmedabad", 23.0900, 72.5900, "Dome 360", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/3", "", "ONLINE"),
                 ("Traffic Branch", "Gujarat Police (Traffic Branch)", "CAM-04", "04 Paldi Circle", "Ahmedabad", "Ahmedabad", 23.0140, 72.5660, "Fixed ANPR Dual", "1080p", 90.0, "North", "Active", "2027-12-31", 90, "https://live.corp8.cloud/stream/4", "", "ONLINE"),
@@ -1185,7 +1185,7 @@ if not st.session_state.authenticated:
 
 # ----------------- DATASETS & MODEL MANAGEMENT (CACHED SINGLETON) -----------------
 STATIC_CCTV_CATALOGUE = [
-    {"stream_id": "14", "cam_id": "CAM-01", "name": "01 Chiman bhai Bridge", "lat": 23.0450, "lon": 72.5710, "city": "Ahmedabad", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
+    {"stream_id": "1", "cam_id": "CAM-01", "name": "01 Chiman bhai Bridge", "lat": 23.0450, "lon": 72.5710, "city": "Ahmedabad", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
     {"stream_id": "2", "cam_id": "CAM-02", "name": "02 Janpath", "lat": 23.0300, "lon": 72.5600, "city": "Ahmedabad", "type": "High-Mast Bullet", "dept": "SCRB Highway", "status": "ONLINE", "verified": True},
     {"stream_id": "3", "cam_id": "CAM-03", "name": "03 O.N.G.C. Office", "lat": 23.0900, "lon": 72.5900, "city": "Ahmedabad", "type": "Dome 360", "dept": "Smart City Mission", "status": "ONLINE", "verified": False},
     {"stream_id": "4", "cam_id": "CAM-04", "name": "04 Paldi Circle", "lat": 23.0140, "lon": 72.5660, "city": "Ahmedabad", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
