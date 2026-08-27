@@ -1572,36 +1572,46 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 </head>
 <body>
 <div class="vid-box">
-    <video id="cctvVid" autoplay muted playsinline controls preload="none" loop></video>
+    <video id="cctvVid" autoplay muted playsinline controls preload="metadata" loop src="{video_src}"></video>
     {badge_html}
 </div>
 <script>
     (function() {{
-        var vid = document.getElementById('cctvVid');
-        var streamUrl = "{video_src}";
+        var v = document.getElementById('cctvVid');
         var delay = {stagger_ms};
 
-        function detachSocket() {{
+        function cleanSocket() {{
             try {{
-                vid.pause();
-                vid.removeAttribute('src');
-                vid.src = "";
-                vid.load();
+                v.pause();
+                v.removeAttribute('src');
+                v.src = "";
+                v.load();
             }} catch(e) {{}}
         }}
 
-        window.addEventListener('beforeunload', detachSocket);
-        window.addEventListener('unload', detachSocket);
-        window.addEventListener('pagehide', detachSocket);
+        window.addEventListener('beforeunload', cleanSocket);
+        window.addEventListener('unload', cleanSocket);
+        window.addEventListener('pagehide', cleanSocket);
+
+        v.onerror = function() {{
+            setTimeout(function() {{
+                try {{
+                    v.load();
+                    v.play().catch(function(){{}});
+                }} catch(e) {{}}
+            }}, 800);
+        }};
 
         setTimeout(function() {{
-            vid.src = streamUrl;
-            var p = vid.play();
-            if (p !== undefined) {{
-                p.catch(function() {{
-                    setTimeout(function() {{ vid.play().catch(function(){{}}); }}, 200);
-                }});
-            }}
+            try {{
+                v.load();
+                var p = v.play();
+                if (p !== undefined) {{
+                    p.catch(function() {{
+                        setTimeout(function() {{ v.play().catch(function(){{}}); }}, 200);
+                    }});
+                }}
+            }} catch(e) {{}}
         }}, delay);
     }})();
 </script>
@@ -2567,12 +2577,11 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             <div class="osd-tag osd-tl">{selected_cam['cam_id']} • {selected_cam['name'].upper()}</div>
             <div class="osd-tag osd-tr">● LIVE REC • {selected_cam['city'].upper()}</div>
             <div class="live-badge">🔴 1080P HD STREAM ACTIVE</div>
-            <video id="vidPlayer" autoplay muted playsinline controls preload="none" loop style="background:#000;"></video>
+            <video id="vidPlayer" autoplay muted playsinline controls preload="metadata" loop src="{stream_mp4_url}" style="background:#000;"></video>
         </div>
         <script>
             (function() {{
                 var v = document.getElementById('vidPlayer');
-                var streamUrl = "{stream_mp4_url}";
 
                 function cleanSocket() {{
                     try {{
@@ -2587,13 +2596,24 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 window.addEventListener('unload', cleanSocket);
                 window.addEventListener('pagehide', cleanSocket);
 
-                v.src = streamUrl;
-                var p = v.play();
-                if (p !== undefined) {{
-                    p.catch(function() {{
-                        setTimeout(function() {{ v.play().catch(function(){{}}); }}, 150);
-                    }});
-                }}
+                v.onerror = function() {{
+                    setTimeout(function() {{
+                        try {{
+                            v.load();
+                            v.play().catch(function(){{}});
+                        }} catch(e) {{}}
+                    }}, 800);
+                }};
+
+                try {{
+                    v.load();
+                    var p = v.play();
+                    if (p !== undefined) {{
+                        p.catch(function() {{
+                            setTimeout(function() {{ v.play().catch(function(){{}}); }}, 150);
+                        }});
+                    }}
+                }} catch(e) {{}}
             }})();
         </script>
         </body>
