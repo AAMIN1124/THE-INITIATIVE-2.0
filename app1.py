@@ -1563,72 +1563,14 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
     badge_html = f'''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;">🔴 LIVE • {cam_id_tag}</div>'''
 
     style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
-    full_html = f'''<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-    body {{ background: transparent; overflow: hidden; }}
-    .vid-box {{ position: relative; width: 100%; height: {height}px; overflow: hidden; border-radius: 14px; border: 1.5px solid {border_color}; box-shadow: 0 6px 20px rgba(14,165,233,0.12); background: #000; }}
-    video {{ width: 100%; height: {height}px; object-fit: cover; border-radius: 14px; background: #000; {style_extra} }}
-</style>
-</head>
-<body>
-<div class="vid-box">
-    <video id="cctvVid" autoplay muted playsinline controls preload="none" loop></video>
-    {badge_html}
-</div>
-<script>
-    (function() {{
-        var v = document.getElementById('cctvVid');
-        var streamUrl = "{video_src}";
-        var baseDelay = {stagger_ms};
-        var jitter = Math.random() * 250;
-
-        function cleanSocket() {{
-            try {{
-                v.pause();
-                v.removeAttribute('src');
-                v.src = "";
-                v.load();
-            }} catch(e) {{}}
-        }}
-
-        window.addEventListener('beforeunload', cleanSocket);
-        window.addEventListener('unload', cleanSocket);
-        window.addEventListener('pagehide', cleanSocket);
-
-        v.onerror = function() {{
-            setTimeout(function() {{
-                try {{
-                    v.load();
-                    v.play().catch(function(){{}});
-                }} catch(e) {{}}
-            }}, 800);
-        }};
-
-        function initStream() {{
-            try {{
-                v.src = streamUrl;
-                var p = v.play();
-                if (p !== undefined) {{
-                    p.catch(function() {{
-                        setTimeout(function() {{ v.play().catch(function(){{}}); }}, 150);
-                    }});
-                }}
-            }} catch(e) {{}}
-        }}
-
-        setTimeout(initStream, baseDelay + jitter);
-    }})();
-</script>
-</body>
-</html>'''
-    try:
-        components.html(full_html, height=height + 20)
-    except Exception:
-        st.markdown(full_html, unsafe_allow_html=True)
+    
+    direct_video_html = f'''
+    <div style="position:relative;width:100%;height:{height}px;overflow:hidden;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);background:#000;margin-bottom:12px;">
+        <video autoplay muted playsinline controls loop src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;background:#000;{style_extra}"></video>
+        {badge_html}
+    </div>
+    '''
+    st.markdown(direct_video_html, unsafe_allow_html=True)
 
 # ----------------- REAL-TIME ZERO-BUFFER RTSP BACKGROUND WORKER DAEMON -----------------
 def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
