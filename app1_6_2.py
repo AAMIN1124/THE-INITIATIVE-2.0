@@ -1554,7 +1554,7 @@ import streamlit.components.v1 as components
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
     if isinstance(cam_obj, dict):
         cam_dict = cam_obj
-        st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "14")))
+        st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "1")))
     else:
         st_id = str(cam_obj).strip()
         cam_dict = next(
@@ -1562,18 +1562,14 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             {"stream_id": st_id, "cam_id": f"CAM-{int(st_id):02d}" if st_id.isdigit() else st_id, "name": f"Camera {st_id}", "city": "Gujarat", "dept": "Traffic Branch", "status": "ONLINE"}
         )
     
-    # Normalize ID: CAM-01 -> 1, CAM-14 -> 14
+    # Strictly normalize ID for the exact selected camera
     if "-" in st_id:
         st_id = st_id.split("-")[-1]
     if st_id.isdigit():
-        st_id = str(int(st_id)) # strip leading zero
+        st_id = str(int(st_id)) # strip leading zero: '01' -> '1', '14' -> '14'
     
-    primary_src = get_active_stream_url(cam_dict)
-    fallback_src = cam_dict.get("stream_fallback") or "https://live.corp8.cloud/stream/14"
-    if not fallback_src:
-        fallback_src = "https://live.corp8.cloud/stream/14"
-        
-    cam_id_tag = cam_dict.get("cam_id", f"CAM-{st_id}")
+    video_src = get_active_stream_url(cam_dict)
+    cam_id_tag = cam_dict.get("cam_id", f"CAM-{int(st_id):02d}" if st_id.isdigit() else st_id)
     badge_html = f'''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;">🔴 LIVE • {cam_id_tag}</div>'''
 
     style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
@@ -1598,28 +1594,37 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 <script>
     (function() {{
         var v = document.getElementById('cctvVid');
-        var primaryUrl = "{primary_src}";
-        var fallbackUrl = "{fallback_src}";
+        var streamUrl = "{video_src}";
         var delay = {stagger_ms};
-        var isFallback = false;
 
-        function attachStream(url) {{
-            if (url.indexOf('.m3u8') !== -1 && Hls.isSupported()) {{
+        function cleanSocket() {{
+            try {{
+                v.pause();
+                v.removeAttribute('src');
+                v.src = "";
+                v.load();
+            }} catch(e) {{}}
+        }}
+
+        window.addEventListener('beforeunload', cleanSocket);
+        window.addEventListener('unload', cleanSocket);
+        window.addEventListener('pagehide', cleanSocket);
+
+        function playStream() {{
+            if (streamUrl.indexOf('.m3u8') !== -1 && Hls.isSupported()) {{
                 var hls = new Hls({{ maxBufferLength: 5, enableWorker: true }});
-                hls.loadSource(url);
+                hls.loadSource(streamUrl);
                 hls.attachMedia(v);
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {{
                     v.play().catch(function(){{}});
                 }});
                 hls.on(Hls.Events.ERROR, function(event, data) {{
-                    if (data.fatal && !isFallback) {{
-                        isFallback = true;
-                        hls.destroy();
-                        attachStream(fallbackUrl);
+                    if (data.fatal) {{
+                        setTimeout(function() {{ hls.loadSource(streamUrl); }}, 1000);
                     }}
                 }});
             }} else {{
-                v.src = url;
+                v.src = streamUrl;
                 v.load();
                 var p = v.play();
                 if (p !== undefined) {{
@@ -1631,15 +1636,15 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         }}
 
         v.onerror = function() {{
-            if (!isFallback) {{
-                isFallback = true;
-                setTimeout(function() {{ attachStream(fallbackUrl); }}, 500);
-            }}
+            setTimeout(function() {{
+                try {{
+                    v.load();
+                    v.play().catch(function(){{}});
+                }} catch(e) {{}}
+            }}, 1000);
         }};
 
-        setTimeout(function() {{
-            attachStream(primaryUrl);
-        }}, delay);
+        setTimeout(playStream, delay);
     }})();
 </script>
 </body>
