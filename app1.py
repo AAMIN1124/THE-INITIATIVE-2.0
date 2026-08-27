@@ -1490,6 +1490,51 @@ def is_domain_resolvable(url, timeout_sec=0.4):
         return False
 
 # ----------------- 100% GENUINE LIVE CCTV STREAM RENDERING ENGINE -----------------
+def get_active_stream_url(identifier):
+    if isinstance(identifier, dict):
+        st_id = str(identifier.get("stream_id", "1"))
+        if identifier.get("custom_url"):
+            return identifier["custom_url"].strip()
+    else:
+        st_id = str(identifier)
+        
+    overrides = st.session_state.get("stream_overrides", {})
+    if st_id in overrides and overrides[st_id].strip():
+        return overrides[st_id].strip()
+    if st_id == "JURY" and "JURY" in overrides:
+        return overrides["JURY"].strip()
+    return f"https://live.corp8.cloud/stream/{st_id}"
+
+def probe_stream_connectivity(url, timeout_sec=2.0):
+    if not url or not isinstance(url, str):
+        return False
+    url = url.strip()
+
+    if url.startswith(("http://", "https://", "rtsp://", "rtmp://")):
+        try:
+            cap_probe = cv2.VideoCapture(url)
+            t0 = time.time()
+            if cap_probe.isOpened():
+                while time.time() - t0 < timeout_sec:
+                    ret, frame = cap_probe.read()
+                    if ret and frame is not None and frame.size > 0:
+                        cap_probe.release()
+                        return True
+                    time.sleep(0.05)
+            cap_probe.release()
+        except Exception:
+            pass
+
+        if url.startswith(("http://", "https://")):
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'SCRB-Command-Terminal/2.0'})
+                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                    if resp.status in [200, 206, 301, 302]:
+                        return True
+            except Exception:
+                pass
+    return False
+
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False):
     if isinstance(cam_obj, dict):
         st_id = str(cam_obj.get("stream_id", "1"))
