@@ -1546,6 +1546,8 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
     
     live_url = get_active_stream_url(cam_obj)
     fallback_mp4 = os.path.join(FALLBACK_FEEDS_DIR, f"cam_{st_id}.mp4")
+    if not os.path.exists(fallback_mp4):
+        fallback_mp4 = os.path.join(FALLBACK_FEEDS_DIR, "cam_1.mp4")
     
     # Seamless failover: if fallback video exists, convert to base64 data URI for 100% offline browser loop playback
     if os.path.exists(fallback_mp4) and os.path.getsize(fallback_mp4) > 10000:
@@ -1558,11 +1560,13 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             video_src = live_url
         badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.9);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🔴 LIVE FEED</div>'''
     else:
-        video_src = live_url
+        # Cache-buster query param prevents browser socket starvation across parallel streams
+        slot_rand = int(time.time() * 1000) % 10000
+        video_src = f"{live_url}?slot={st_id}_{slot_rand}" if "?" not in live_url else f"{live_url}&slot={st_id}_{slot_rand}"
         badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.9);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🔴 LIVE FEED</div>'''
 
     style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
-    full_html = f'''<div style="position:relative;overflow:hidden;border-radius:14px;margin-bottom:12px;"><video autoplay muted playsinline controls loop src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);{style_extra}"></video>{badge_html}</div>'''
+    full_html = f'''<div style="position:relative;overflow:hidden;border-radius:14px;margin-bottom:12px;"><video autoplay muted playsinline preload="auto" loop onloadedmetadata="this.play();" src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);{style_extra}"></video>{badge_html}</div>'''
     try:
         st.html(full_html)
     except Exception:
@@ -2499,7 +2503,18 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         }
         active_video_filter = filter_css_map.get(filter_mode, filter_css_map["Standard HD (Optimized)"])
         st_num = selected_cam["stream_id"]
-        stream_mp4_url = get_active_stream_url(st_num)
+        
+        fallback_mp4_single = os.path.join(FALLBACK_FEEDS_DIR, f"cam_{st_num}.mp4")
+        if os.path.exists(fallback_mp4_single) and os.path.getsize(fallback_mp4_single) > 10000:
+            try:
+                import base64
+                with open(fallback_mp4_single, "rb") as vf:
+                    b64_str = base64.b64encode(vf.read()).decode('utf-8')
+                stream_mp4_url = f"data:video/mp4;base64,{b64_str}"
+            except Exception:
+                stream_mp4_url = get_active_stream_url(st_num)
+        else:
+            stream_mp4_url = get_active_stream_url(st_num)
 
         st.markdown(f"""
         <div class="kpi-card kpi-card-green" style="min-height: 60px !important; height: 60px !important; display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 14px !important; padding: 12px 20px !important; margin-bottom: 16px !important;">
@@ -2518,37 +2533,37 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         <style>
             * {{ box-sizing: border-box; margin: 0; padding: 0; }}
             body {{ background: transparent; color: #000000; font-family: 'Inter', sans-serif; }}
-            .container {{ position: relative; width: 100%; max-width: 960px; height: 500px; background: #000; border: 1px solid rgba(134, 239, 172, 0.6); border-radius: 18px; overflow: hidden; box-shadow: 0 12px 35px rgba(34, 197, 94, 0.18); }}
+            .container {{ position: relative; width: 100%; max-width: 960px; height: 500px; background: #000; border: 1.5px solid rgba(134, 239, 172, 0.8); border-radius: 18px; overflow: hidden; box-shadow: 0 12px 35px rgba(34, 197, 94, 0.18); }}
             video {{
                 width: 100%;
                 height: 100%;
-                object-fit: contain;
+                object-fit: cover;
                 image-rendering: -webkit-optimize-contrast;
                 image-rendering: crisp-edges;
                 {active_video_filter}
                 transform: translateZ(0);
                 backface-visibility: hidden;
             }}
-            .osd-tag {{ position: absolute; z-index: 15; background: rgba(240, 253, 244, 0.85); backdrop-filter: blur(16px); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; border: 1px solid rgba(134, 239, 172, 0.9); color: #15803D; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.08); }}
+            .osd-tag {{ position: absolute; z-index: 15; background: rgba(240, 253, 244, 0.9); backdrop-filter: blur(16px); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; border: 1px solid rgba(134, 239, 172, 0.9); color: #15803D; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.08); }}
             .osd-tl {{ top: 14px; left: 16px; }}
             .osd-tr {{ top: 14px; right: 16px; color: #166534; font-weight: 800; }}
-            .play-overlay {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(10px); display: flex; justify-content: center; align-items: center; z-index: 30; cursor: pointer; }}
-            .play-btn {{ background: #000000; color: #FFFFFF !important; font-size: 15px; font-weight: 800; padding: 14px 32px; border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; font-family: 'Inter', sans-serif; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }}
+            .live-badge {{ position: absolute; bottom: 18px; left: 18px; z-index: 15; background: rgba(239, 68, 68, 0.95); color: #FFFFFF; padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }}
         </style>
         </head>
         <body>
         <div class="container">
             <div class="osd-tag osd-tl">{selected_cam['cam_id']} • {selected_cam['name'].upper()}</div>
             <div class="osd-tag osd-tr">● LIVE REC • {selected_cam['city'].upper()}</div>
-            <div class="play-overlay" id="overlay" onclick="document.getElementById('vidPlayer').play(); this.style.display='none';">
-                <button class="play-btn">START LIVE CAMERA FEED</button>
-            </div>
-            <video id="vidPlayer" autoplay muted playsinline controls loop src="{stream_mp4_url}"></video>
+            <div class="live-badge">🔴 1080P HD STREAM ACTIVE</div>
+            <video id="vidPlayer" autoplay muted playsinline controls preload="auto" loop onloadedmetadata="this.play();" src="{stream_mp4_url}"></video>
         </div>
         </body>
         </html>
         """
-        st.html(interactive_player_html)
+        try:
+            st.html(interactive_player_html)
+        except Exception:
+            st.markdown(interactive_player_html, unsafe_allow_html=True)
 
         c_radar_in, c_radar_act = st.columns([2, 1])
         with c_radar_in:
@@ -2598,8 +2613,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A;">01 Chiman bhai Bridge (Ahmedabad)</span>
             </div>
             """, unsafe_allow_html=True)
-            dual_cam1_html = """<!DOCTYPE html><html><body style="background: transparent; margin: 0; overflow: hidden;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('1')}" style="width: 100%; height: 320px; object-fit: contain; image-rendering: crisp-edges; filter: contrast(120%) brightness(95%); border-radius: 14px; border: 1px solid rgba(134, 239, 172, 0.8); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.12);"></video></body></html>"""
-            st.html(dual_cam1_html)
+            render_cctv_live_container('1', height=320, border_color="rgba(134,239,172,0.8)", is_dual_main=True)
 
         with d_col2:
             st.markdown("""
@@ -2608,8 +2622,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A;">14 Delight Junction (Vadodara)</span>
             </div>
             """, unsafe_allow_html=True)
-            dual_cam14_html = """<!DOCTYPE html><html><body style="background: transparent; margin: 0; overflow: hidden;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width: 100%; height: 320px; object-fit: contain; image-rendering: crisp-edges; filter: contrast(120%) brightness(95%); border-radius: 14px; border: 1px solid rgba(186, 230, 253, 0.8); box-shadow: 0 6px 20px rgba(14, 165, 233, 0.12);"></video></body></html>"""
-            st.html(dual_cam14_html)
+            render_cctv_live_container('14', height=320, border_color="rgba(186,230,253,0.8)", is_dual_main=True)
 
         dt1, dt2, dt3, dt4 = st.columns(4)
         with dt1: render_metric_card("Cam 01 Density", "42 Vehicles/Min", "🟢 Free Flow (AMTS Lane Clear)", color="green")
@@ -3101,9 +3114,7 @@ elif nav_section == "Automated Crash & Accident 108 AI":
     ac_col1, ac_col2 = st.columns([1.4, 1])
 
     with ac_col1:
-        st.markdown("""
-        <!DOCTYPE html><html><body style="margin:0;"><video autoplay muted playsinline controls loop src="{get_active_stream_url('14')}" style="width:100%;height:340px;object-fit:cover;border-radius:14px;border:2px solid rgba(244,63,94,0.9);box-shadow:0 8px 25px rgba(225,29,72,0.18);"></video></body></html>
-        """, unsafe_allow_html=True)
+        render_cctv_live_container('14', height=340, border_color="rgba(244,63,94,0.9)", is_dual_main=True)
 
     with ac_col2:
         st.markdown("""
