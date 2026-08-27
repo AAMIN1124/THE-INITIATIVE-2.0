@@ -2538,8 +2538,6 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             "Forensic Edge & Plate Enhancer": "filter: contrast(180%) grayscale(100%) brightness(110%);"
         }
         active_video_filter = filter_css_map.get(filter_mode, filter_css_map["Standard HD (Optimized)"])
-        st_num = selected_cam["stream_id"]
-        stream_mp4_url = get_active_stream_url(st_num)
 
         st.markdown(f"""
         <div class="kpi-card kpi-card-green" style="min-height: 60px !important; height: 60px !important; display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 14px !important; padding: 12px 20px !important; margin-bottom: 16px !important;">
@@ -2550,83 +2548,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         </div>
         """, unsafe_allow_html=True)
 
-        interactive_player_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta charset="utf-8">
-        <style>
-            * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-            body {{ background: transparent; color: #000000; font-family: 'Inter', sans-serif; overflow: hidden; }}
-            .container {{ position: relative; width: 100%; height: 500px; background: #000; border: 1.5px solid rgba(134, 239, 172, 0.8); border-radius: 18px; overflow: hidden; box-shadow: 0 12px 35px rgba(34, 197, 94, 0.18); }}
-            video {{
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-                background: #000;
-                image-rendering: -webkit-optimize-contrast;
-                image-rendering: crisp-edges;
-                {active_video_filter}
-                transform: translateZ(0);
-                backface-visibility: hidden;
-            }}
-            .osd-tag {{ position: absolute; z-index: 15; background: rgba(240, 253, 244, 0.9); backdrop-filter: blur(16px); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; border: 1px solid rgba(134, 239, 172, 0.9); color: #15803D; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.08); }}
-            .osd-tl {{ top: 14px; left: 16px; }}
-            .osd-tr {{ top: 14px; right: 16px; color: #166534; font-weight: 800; }}
-            .live-badge {{ position: absolute; bottom: 18px; left: 18px; z-index: 15; background: rgba(239, 68, 68, 0.95); color: #FFFFFF; padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }}
-        </style>
-        </head>
-        <body>
-        <div class="container">
-            <div class="osd-tag osd-tl">{selected_cam['cam_id']} • {selected_cam['name'].upper()}</div>
-            <div class="osd-tag osd-tr">● LIVE REC • {selected_cam['city'].upper()}</div>
-            <div class="live-badge">🔴 1080P HD STREAM ACTIVE</div>
-            <video id="vidPlayer" autoplay muted playsinline controls preload="metadata" loop src="{stream_mp4_url}" style="background:#000;"></video>
-        </div>
-        <script>
-            (function() {{
-                var v = document.getElementById('vidPlayer');
-
-                function cleanSocket() {{
-                    try {{
-                        v.pause();
-                        v.removeAttribute('src');
-                        v.src = "";
-                        v.load();
-                    }} catch(e) {{}}
-                }}
-
-                window.addEventListener('beforeunload', cleanSocket);
-                window.addEventListener('unload', cleanSocket);
-                window.addEventListener('pagehide', cleanSocket);
-
-                v.onerror = function() {{
-                    setTimeout(function() {{
-                        try {{
-                            v.load();
-                            v.play().catch(function(){{}});
-                        }} catch(e) {{}}
-                    }}, 800);
-                }};
-
-                try {{
-                    v.load();
-                    var p = v.play();
-                    if (p !== undefined) {{
-                        p.catch(function() {{
-                            setTimeout(function() {{ v.play().catch(function(){{}}); }}, 150);
-                        }});
-                    }}
-                }} catch(e) {{}}
-            }})();
-        </script>
-        </body>
-        </html>
-        """
-        try:
-            components.html(interactive_player_html, height=525)
-        except Exception:
-            st.markdown(interactive_player_html, unsafe_allow_html=True)
+        render_cctv_live_container(selected_cam, height=480, border_color="rgba(134,239,172,0.9)")
 
         c_radar_in, c_radar_act = st.columns([2, 1])
         with c_radar_in:
