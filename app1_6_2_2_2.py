@@ -1559,7 +1559,7 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
     badge_html = f'''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;">🔴 LIVE • {cam_id_tag}</div>'''
 
     style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
-    full_html = f'''<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{{box-sizing:border-box;margin:0;padding:0;}}body{{background:transparent;overflow:hidden;}}</style></head><body><div style="position:relative;width:100%;height:{height}px;overflow:hidden;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);background:#000;"><video autoplay muted playsinline controls preload="auto" loop onloadedmetadata="this.play();" src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;background:#000;{style_extra}"></video>{badge_html}</div></body></html>'''
+    full_html = f'''<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{{box-sizing:border-box;margin:0;padding:0;}}body{{background:transparent;overflow:hidden;}}</style></head><body><div style="position:relative;width:100%;height:{height}px;overflow:hidden;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);background:#000;"><video autoplay muted playsinline controls preload="metadata" loop onloadeddata="this.play();" src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;background:#000;{style_extra}"></video>{badge_html}</div></body></html>'''
     try:
         components.html(full_html, height=height + 20)
     except Exception:
@@ -2484,7 +2484,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         <div class="kpi-card kpi-card-green" style="min-height: 60px !important; height: 60px !important; display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 14px !important; padding: 12px 20px !important; margin-bottom: 16px !important;">
             <span class="soc-badge soc-badge-online">LIVE STREAMING</span>
             <span style="font-weight: 800; font-size: 0.95rem; color: #0F172A;">{selected_cam['cam_id']} : {selected_cam['name']}</span>
-            <span style="color: #15803D; font-size: 0.88rem;">({selected_cam['city']} • {selected_cam['dept']})</span>
+            <span style="color: #15803D; font-size: 0.88rem;">({selected_cam.get('city', 'Gujarat')} • {selected_cam.get('dept', selected_cam.get('dept_name', 'Traffic Branch'))})</span>
             <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.84rem; color: #0F172A; font-weight: 600;">GPS: {selected_cam['lat']}, {selected_cam['lon']}</span>
         </div>
         """, unsafe_allow_html=True)
@@ -2520,7 +2520,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             <div class="osd-tag osd-tl">{selected_cam['cam_id']} • {selected_cam['name'].upper()}</div>
             <div class="osd-tag osd-tr">● LIVE REC • {selected_cam['city'].upper()}</div>
             <div class="live-badge">🔴 1080P HD STREAM ACTIVE</div>
-            <video id="vidPlayer" autoplay muted playsinline controls preload="auto" loop onloadedmetadata="this.play();" src="{stream_mp4_url}" style="background:#000;"></video>
+            <video id="vidPlayer" autoplay muted playsinline controls preload="metadata" loop onloadeddata="this.play();" src="{stream_mp4_url}" style="background:#000;"></video>
         </div>
         </body>
         </html>
