@@ -1489,55 +1489,7 @@ def is_domain_resolvable(url, timeout_sec=0.4):
         DNS_CACHE[hostname] = (False, now + 45.0)
         return False
 
-# ----------------- RESILIENT LIVE CCTV STREAM RENDERING ENGINE -----------------
-FALLBACK_FEEDS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fallback_feeds")
-os.makedirs(FALLBACK_FEEDS_DIR, exist_ok=True)
-
-def get_active_stream_url(identifier):
-    if isinstance(identifier, dict):
-        st_id = str(identifier.get("stream_id", "1"))
-        if identifier.get("custom_url"):
-            return identifier["custom_url"].strip()
-    else:
-        st_id = str(identifier)
-        
-    overrides = st.session_state.get("stream_overrides", {})
-    if st_id in overrides and overrides[st_id].strip():
-        return overrides[st_id].strip()
-    if st_id == "JURY" and "JURY" in overrides:
-        return overrides["JURY"].strip()
-    return f"https://live.corp8.cloud/stream/{st_id}"
-
-def probe_stream_connectivity(url, timeout_sec=2.0):
-    if not url or not isinstance(url, str):
-        return False
-    url = url.strip()
-
-    if url.startswith(("http://", "https://", "rtsp://", "rtmp://")):
-        try:
-            cap_probe = cv2.VideoCapture(url)
-            t0 = time.time()
-            if cap_probe.isOpened():
-                while time.time() - t0 < timeout_sec:
-                    ret, frame = cap_probe.read()
-                    if ret and frame is not None and frame.size > 0:
-                        cap_probe.release()
-                        return True
-                    time.sleep(0.05)
-            cap_probe.release()
-        except Exception:
-            pass
-
-        if url.startswith(("http://", "https://")):
-            try:
-                req = urllib.request.Request(url, headers={'User-Agent': 'SCRB-Command-Terminal/2.0'})
-                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
-                    if resp.status in [200, 206, 301, 302]:
-                        return True
-            except Exception:
-                pass
-    return False
-
+# ----------------- 100% GENUINE LIVE CCTV STREAM RENDERING ENGINE -----------------
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False):
     if isinstance(cam_obj, dict):
         st_id = str(cam_obj.get("stream_id", "1"))
@@ -1545,25 +1497,9 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         st_id = str(cam_obj)
     
     live_url = get_active_stream_url(cam_obj)
-    fallback_mp4 = os.path.join(FALLBACK_FEEDS_DIR, f"cam_{st_id}.mp4")
-    if not os.path.exists(fallback_mp4):
-        fallback_mp4 = os.path.join(FALLBACK_FEEDS_DIR, "cam_1.mp4")
-    
-    # Seamless failover: if fallback video exists, convert to base64 data URI for 100% offline browser loop playback
-    if os.path.exists(fallback_mp4) and os.path.getsize(fallback_mp4) > 10000:
-        try:
-            import base64
-            with open(fallback_mp4, "rb") as vf:
-                b64_str = base64.b64encode(vf.read()).decode('utf-8')
-            video_src = f"data:video/mp4;base64,{b64_str}"
-        except Exception:
-            video_src = live_url
-        badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.9);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🔴 LIVE FEED</div>'''
-    else:
-        # Cache-buster query param prevents browser socket starvation across parallel streams
-        slot_rand = int(time.time() * 1000) % 10000
-        video_src = f"{live_url}?slot={st_id}_{slot_rand}" if "?" not in live_url else f"{live_url}&slot={st_id}_{slot_rand}"
-        badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.9);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🔴 LIVE FEED</div>'''
+    slot_rand = int(time.time() * 1000) % 10000
+    video_src = f"{live_url}?slot={st_id}_{slot_rand}" if "?" not in live_url else f"{live_url}&slot={st_id}_{slot_rand}"
+    badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.9);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🔴 LIVE FEED</div>'''
 
     style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
     full_html = f'''<div style="position:relative;overflow:hidden;border-radius:14px;margin-bottom:12px;"><video autoplay muted playsinline preload="auto" loop onloadedmetadata="this.play();" src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);{style_extra}"></video>{badge_html}</div>'''
@@ -1575,7 +1511,6 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 # ----------------- REAL-TIME ZERO-BUFFER RTSP BACKGROUND WORKER DAEMON -----------------
 def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
     cam_id = str(cam_obj.get("cam_id", cam_obj.get("stream_id", "1")))
-    stream_id = str(cam_obj.get("stream_id", "1"))
     
     try:
         yolo_model, ocr_reader = get_ai_models()
@@ -1589,12 +1524,7 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
 
     while not stop_event.is_set():
         stream_url = get_active_stream_url(cam_obj)
-        fallback_mp4 = os.path.join(FALLBACK_FEEDS_DIR, f"cam_{stream_id}.mp4")
-        if not os.path.exists(fallback_mp4):
-            fallback_mp4 = os.path.join(FALLBACK_FEEDS_DIR, "cam_1.mp4")
-
         cap = None
-        is_fallback_mode = False
 
         try:
             # Force RTSP over TCP
@@ -1605,17 +1535,13 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
             if not cap.isOpened():
                 if cap is not None:
                     cap.release()
-                if os.path.exists(fallback_mp4) and os.path.getsize(fallback_mp4) > 10000:
-                    cap = cv2.VideoCapture(fallback_mp4)
-                    is_fallback_mode = True
-                else:
-                    # Exponential backoff on connection failure
-                    for _ in range(int(backoff_delay * 10)):
-                        if stop_event.is_set():
-                            break
-                        time.sleep(0.1)
-                    backoff_delay = min(max_backoff, backoff_delay * 2)
-                    continue
+                # Exponential backoff directly on live network endpoint
+                for _ in range(int(backoff_delay * 10)):
+                    if stop_event.is_set():
+                        break
+                    time.sleep(0.1)
+                backoff_delay = min(max_backoff, backoff_delay * 2)
+                continue
 
             # Connected successfully -> reset backoff delay
             backoff_delay = 2.0
@@ -1624,13 +1550,7 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
             while not stop_event.is_set():
                 ret, frame = cap.read()
                 if not ret or frame is None or frame.size == 0:
-                    if is_fallback_mode or (os.path.exists(fallback_mp4) and os.path.getsize(fallback_mp4) > 10000):
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                        ret, frame = cap.read()
-                        if not ret or frame is None:
-                            break
-                    else:
-                        break
+                    break
 
                 now = time.time()
                 if now - last_sample_time < sample_interval:
@@ -1714,7 +1634,7 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
                 except Exception:
                     pass
 
-        # Exponential backoff sleep before reconnecting
+        # Exponential backoff before reconnecting on live stream cut
         if not stop_event.is_set():
             for _ in range(int(backoff_delay * 10)):
                 if stop_event.is_set():
@@ -2503,18 +2423,9 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         }
         active_video_filter = filter_css_map.get(filter_mode, filter_css_map["Standard HD (Optimized)"])
         st_num = selected_cam["stream_id"]
-        
-        fallback_mp4_single = os.path.join(FALLBACK_FEEDS_DIR, f"cam_{st_num}.mp4")
-        if os.path.exists(fallback_mp4_single) and os.path.getsize(fallback_mp4_single) > 10000:
-            try:
-                import base64
-                with open(fallback_mp4_single, "rb") as vf:
-                    b64_str = base64.b64encode(vf.read()).decode('utf-8')
-                stream_mp4_url = f"data:video/mp4;base64,{b64_str}"
-            except Exception:
-                stream_mp4_url = get_active_stream_url(st_num)
-        else:
-            stream_mp4_url = get_active_stream_url(st_num)
+        slot_rand_single = int(time.time() * 1000) % 10000
+        live_raw = get_active_stream_url(st_num)
+        stream_mp4_url = f"{live_raw}?slot={st_num}_{slot_rand_single}" if "?" not in live_raw else f"{live_raw}&slot={st_num}_{slot_rand_single}"
 
         st.markdown(f"""
         <div class="kpi-card kpi-card-green" style="min-height: 60px !important; height: 60px !important; display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 14px !important; padding: 12px 20px !important; margin-bottom: 16px !important;">
