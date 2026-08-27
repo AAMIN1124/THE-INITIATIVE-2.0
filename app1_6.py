@@ -5,7 +5,7 @@ import warnings
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
 os.environ["OPENCV_LOG_LEVEL"] = "OFF"
 os.environ["AV_LOG_FORCE_NOCOLOR"] = "1"
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "timeout;2000|rtsp_transport;tcp"
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;2000"
 warnings.filterwarnings("ignore")
 
 import socket
@@ -122,6 +122,101 @@ def get_db_connection():
     conn = sqlite3.connect(DB_PATH, timeout=15.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
+
+def init_db():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS egujcop_watchlist (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plate_clean TEXT UNIQUE NOT NULL,
+            plate_formatted TEXT NOT NULL,
+            fir_no TEXT NOT NULL,
+            police_station TEXT NOT NULL,
+            offence TEXT NOT NULL,
+            sections TEXT NOT NULL,
+            status TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            owner_vahan TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS cctv_department_registry (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dept_code TEXT NOT NULL,
+            dept_name TEXT NOT NULL,
+            camera_id TEXT UNIQUE NOT NULL,
+            location_name TEXT NOT NULL,
+            district TEXT NOT NULL,
+            city TEXT NOT NULL,
+            lat REAL NOT NULL,
+            lon REAL NOT NULL,
+            camera_type TEXT NOT NULL,
+            resolution TEXT NOT NULL,
+            fov_deg REAL NOT NULL,
+            direction TEXT NOT NULL,
+            sla_status TEXT NOT NULL,
+            sla_expiry_date TEXT NOT NULL,
+            retention_days INTEGER NOT NULL,
+            stream_primary TEXT,
+            stream_fallback TEXT,
+            status TEXT NOT NULL
+        )
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS cctv_sightings_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id TEXT UNIQUE NOT NULL,
+            plate_clean TEXT NOT NULL,
+            plate_formatted TEXT NOT NULL,
+            timestamp_iso TEXT NOT NULL,
+            pts_timestamp TEXT NOT NULL,
+            pts_seconds REAL NOT NULL,
+            vehicle_type TEXT NOT NULL,
+            yolo_conf REAL NOT NULL,
+            ocr_conf REAL NOT NULL,
+            checkpost_name TEXT NOT NULL,
+            city TEXT NOT NULL,
+            lat REAL NOT NULL,
+            lon REAL NOT NULL,
+            egujcop_match TEXT,
+            source TEXT NOT NULL
+        )
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp_iso TEXT NOT NULL,
+            user TEXT NOT NULL,
+            action TEXT NOT NULL,
+            details TEXT
+        )
+        """)
+
+        # Auto-seed default watchlist if empty
+        cur.execute("SELECT COUNT(*) FROM egujcop_watchlist")
+        if cur.fetchone()[0] == 0:
+            seed_wl = [
+                ("GJ01AB1234", "GJ 01 AB 1234", "FIR #442/2026", "Navrangpura Police Station, Ahmedabad", "Stolen Vehicle (Vehicle Theft Under BNS)", "Sec 379 IPC / Sec 303(2) BNS", "CRITICAL RED NOTICE", "HIGH", "Rahul M. Patel (Chassis: MA3EYD21S0091823)", "2026-02-10 10:30:00"),
+                ("GJ06CD8842", "GJ 06 CD 8842", "FIR #108/2026", "CID Crime Gandhinagar", "Wanted Suspect Intercept (Economic Offence & Bail Evader)", "Sec 420 / 406 IPC / Sec 318 BNS", "NON-BAILABLE WARRANT", "CRITICAL", "Suresh B. Desai", "2026-02-12 14:15:00"),
+                ("AK64DMV", "AK 64 DMV", "SCRB-INTERPOL-881", "Special Operations Group (SOG) Gujarat", "Suspect Contraband Transit (Foreign Registration Clone)", "Customs Act Sec 135 / BNS Sec 111", "INTERCEPT ON SIGHT", "CRITICAL", "Interstate Freight Transit", "2026-02-14 09:00:00"),
+                ("GJ03HK9921", "GJ 03 HK 9921", "ECL-TC-2026-904", "Pradyuman Nagar Traffic Branch, Rajkot", "Commercial Fitness Expired / Tax Default (14 Months)", "Sec 56 / 192 Motor Vehicles Act", "IMPOUND ADVISORY", "MEDIUM", "Kishore K. Vala", "2026-02-15 16:45:00"),
+                ("RJ14CC4412", "RJ 14 CC 4412", "FIR #312/2026", "Adalaj Police Station, Gandhinagar", "Toll Plaza Ramming & Rash Driving", "Sec 279 / 336 IPC", "WARRANT PENDING", "HIGH", "Interstate Transport Corp", "2026-02-16 11:20:00")
+            ]
+            cur.executemany("INSERT INTO egujcop_watchlist (plate_clean, plate_formatted, fir_no, police_station, offence, sections, status, priority, owner_vahan, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", seed_wl)
+
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+init_db()
 
 # ----------------- LEVENSHTEIN FUZZY MATCH ENGINE -----------------
 def levenshtein_distance(s1, s2):
@@ -1068,7 +1163,12 @@ STATIC_CCTV_CATALOGUE = [
     {"stream_id": "22", "cam_id": "CAM-22", "name": "22 BK Mervada tran Rasta", "lat": 24.1700, "lon": 72.4300, "city": "Banaskantha", "type": "Toll Barrier ANPR", "dept": "Highway Patrol", "status": "ONLINE", "verified": True},
     {"stream_id": "23", "cam_id": "CAM-23", "name": "23 Kheram Checkpost", "lat": 22.5640, "lon": 72.9280, "city": "Anand", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
     {"stream_id": "24", "cam_id": "CAM-24", "name": "24 Dehgam Junction", "lat": 23.1670, "lon": 72.8120, "city": "Gandhinagar", "type": "Highway ANPR", "dept": "North Zone Patrol", "status": "ONLINE", "verified": False},
-    {"stream_id": "25", "cam_id": "CAM-25", "name": "25 Dhanori Checkpost", "lat": 20.9020, "lon": 72.9200, "city": "Navsari", "type": "Coastal Radar PTZ", "dept": "Marine Police", "status": "ONLINE", "verified": False}
+    {"stream_id": "25", "cam_id": "CAM-25", "name": "25 Dhanori Checkpost", "lat": 20.9020, "lon": 72.9200, "city": "Navsari", "type": "Coastal Radar PTZ", "dept": "Marine Police", "status": "ONLINE", "verified": False},
+    {"stream_id": "26", "cam_id": "CAM-26", "name": "26 Ratanpur Border Checkpost", "lat": 23.8500, "lon": 73.1200, "city": "Sabarkantha", "type": "4K ANPR PTZ", "dept": "SCRB Highway", "status": "ONLINE", "verified": True},
+    {"stream_id": "27", "cam_id": "CAM-27", "name": "27 Mandvi Coastal Radar Checkpoint", "lat": 22.8300, "lon": 69.3500, "city": "Kutch", "type": "Coastal Radar PTZ", "dept": "Marine Police", "status": "ONLINE", "verified": True},
+    {"stream_id": "28", "cam_id": "CAM-28", "name": "28 Chhota Udaipur Transit Barrier", "lat": 22.3080, "lon": 74.0150, "city": "Chhota Udaipur", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
+    {"stream_id": "29", "cam_id": "CAM-29", "name": "29 Morbi Ceramic Highway Node", "lat": 22.8120, "lon": 70.8350, "city": "Morbi", "type": "High-Mast Bullet", "dept": "City Police", "status": "ONLINE", "verified": True},
+    {"stream_id": "30", "cam_id": "CAM-30", "name": "30 Somnath Temple Perimeter", "lat": 20.8880, "lon": 70.4010, "city": "Somnath", "type": "Dome 360", "dept": "State Security", "status": "ONLINE", "verified": True}
 ]
 
 GUJARAT_HIGHWAY_CORRIDORS = {
@@ -1113,7 +1213,7 @@ def fetch_dynamic_cctv_catalogue():
                             c_type = item.get("type", "4K ANPR PTZ")
                             dept = item.get("dept", item.get("department", "Traffic Branch"))
                             status = item.get("status", "ONLINE").upper()
-                            is_ver = st_id in ["1", "2", "4", "7", "12", "14", "15", "22"]
+                            is_ver = st_id in ["1", "2", "4", "7", "12", "14", "15", "22", "26", "27", "28", "29", "30"]
                             parsed.append({
                                 "stream_id": st_id,
                                 "cam_id": c_id,
@@ -3163,9 +3263,10 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
             scan_progress = st.progress(0.0)
             scan_status = st.empty()
 
-            # ----------------- SUB-3-SECOND VIDEO FORENSIC ENGINE -----------------
-            step = max(1, int(fps * 1.0))  # Exactly 1 frame per second of video
+            # ----------------- SUB-3-SECOND VIDEO FORENSIC ENGINE (HARDWARE PTS) -----------------
+            step = max(1, int(fps * 1.0))
             current_frame = 0
+            last_known_pts_ms = 0.0
 
             while current_frame < total_frames:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
@@ -3178,13 +3279,8 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                 scan_progress.progress(prog_val)
                 scan_status.caption(f"⚡ High-Speed Hardware Seek: Frame {current_frame+1}/{total_frames} ({int(prog_val * 100)}%) | 1 Frame/Sec...")
 
-                # Exact Hardware Presentation Timestamp
-                pts_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
-                if pts_ms > 0 and abs((pts_ms / 1000.0) - (current_frame / fps)) < 3.0:
-                    real_sec = pts_ms / 1000.0
-                else:
-                    real_sec = current_frame / fps
-
+                # Strict Hardware Presentation Timestamp extraction
+                real_sec, last_known_pts_ms = extract_hardware_pts(cap, last_known_pts_ms)
                 real_time_str = format_exact_pts(real_sec)
                 fh, fw = frame.shape[:2]
 
