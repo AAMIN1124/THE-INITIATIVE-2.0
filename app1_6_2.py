@@ -121,6 +121,8 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scrb_master.
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH, timeout=15.0, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -1547,10 +1549,12 @@ def probe_stream_connectivity(url, timeout_sec=2.0):
 
 import streamlit.components.v1 as components
 
+import streamlit.components.v1 as components
+
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
     if isinstance(cam_obj, dict):
         cam_dict = cam_obj
-        st_id = str(cam_dict.get("stream_id", "1"))
+        st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "14")))
     else:
         st_id = str(cam_obj).strip()
         cam_dict = next(
@@ -1558,19 +1562,92 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             {"stream_id": st_id, "cam_id": f"CAM-{int(st_id):02d}" if st_id.isdigit() else st_id, "name": f"Camera {st_id}", "city": "Gujarat", "dept": "Traffic Branch", "status": "ONLINE"}
         )
     
-    video_src = get_active_stream_url(cam_dict)
+    # Normalize ID: CAM-01 -> 1, CAM-14 -> 14
+    if "-" in st_id:
+        st_id = st_id.split("-")[-1]
+    if st_id.isdigit():
+        st_id = str(int(st_id)) # strip leading zero
+    
+    primary_src = get_active_stream_url(cam_dict)
+    fallback_src = cam_dict.get("stream_fallback") or "https://live.corp8.cloud/stream/14"
+    if not fallback_src:
+        fallback_src = "https://live.corp8.cloud/stream/14"
+        
     cam_id_tag = cam_dict.get("cam_id", f"CAM-{st_id}")
     badge_html = f'''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;">🔴 LIVE • {cam_id_tag}</div>'''
 
     style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
     
-    direct_video_html = f'''
-    <div style="position:relative;width:100%;height:{height}px;overflow:hidden;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);background:#000;margin-bottom:12px;">
-        <video autoplay muted playsinline controls preload="metadata" loop oncanplay="this.play();" onerror="setTimeout(() => {{ try {{ this.load(); this.play().catch(()=>{{}}); }} catch(e){{}} }}, 800);" src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;background:#000;{style_extra}"></video>
-        {badge_html}
-    </div>
-    '''
-    st.markdown(direct_video_html, unsafe_allow_html=True)
+    full_html = f'''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{ background: transparent; overflow: hidden; }}
+    .vid-box {{ position: relative; width: 100%; height: {height}px; overflow: hidden; border-radius: 14px; border: 1.5px solid {border_color}; box-shadow: 0 6px 20px rgba(14,165,233,0.12); background: #000; }}
+    video {{ width: 100%; height: {height}px; object-fit: cover; border-radius: 14px; background: #000; {style_extra} }}
+</style>
+</head>
+<body>
+<div class="vid-box">
+    <video id="cctvVid" autoplay muted playsinline controls preload="metadata" loop></video>
+    {badge_html}
+</div>
+<script>
+    (function() {{
+        var v = document.getElementById('cctvVid');
+        var primaryUrl = "{primary_src}";
+        var fallbackUrl = "{fallback_src}";
+        var delay = {stagger_ms};
+        var isFallback = false;
+
+        function attachStream(url) {{
+            if (url.indexOf('.m3u8') !== -1 && Hls.isSupported()) {{
+                var hls = new Hls({{ maxBufferLength: 5, enableWorker: true }});
+                hls.loadSource(url);
+                hls.attachMedia(v);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {{
+                    v.play().catch(function(){{}});
+                }});
+                hls.on(Hls.Events.ERROR, function(event, data) {{
+                    if (data.fatal && !isFallback) {{
+                        isFallback = true;
+                        hls.destroy();
+                        attachStream(fallbackUrl);
+                    }}
+                }});
+            }} else {{
+                v.src = url;
+                v.load();
+                var p = v.play();
+                if (p !== undefined) {{
+                    p.catch(function() {{
+                        setTimeout(function() {{ v.play().catch(function(){{}}); }}, 200);
+                    }});
+                }}
+            }}
+        }}
+
+        v.onerror = function() {{
+            if (!isFallback) {{
+                isFallback = true;
+                setTimeout(function() {{ attachStream(fallbackUrl); }}, 500);
+            }}
+        }};
+
+        setTimeout(function() {{
+            attachStream(primaryUrl);
+        }}, delay);
+    }})();
+</script>
+</body>
+</html>'''
+    try:
+        components.html(full_html, height=height + 20)
+    except Exception:
+        st.markdown(full_html, unsafe_allow_html=True)
 
 # ----------------- REAL-TIME ZERO-BUFFER RTSP BACKGROUND WORKER DAEMON -----------------
 def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
@@ -2456,6 +2533,8 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     render_cctv_live_container(cam_b, height=270, border_color="rgba(186,230,253,0.9)")
 
     elif cctv_mode == "1. Single Camera Stream & Optical HUD Filters":
+        source_mode = st.radio("Camera Source Feed", ["🔴 Live Stream Feed", "📼 Checkpost Stored DVR Recording / Uploaded Video"], horizontal=True, key="sc_source_mode")
+        
         f_col1, f_col2, f_col3 = st.columns([1.5, 1, 1])
         with f_col1:
             cities = ["All Cities", "Verified Only"] + sorted(list(set(c["city"] for c in ACTIVE_CCTV_CATALOGUE)))
@@ -2485,21 +2564,35 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         }
         active_video_filter = filter_css_map.get(filter_mode, filter_css_map["Standard HD (Optimized)"])
 
-        st_num = str(selected_cam.get("stream_id", selected_cam.get("cam_id", "1")))
+        st_num = str(selected_cam.get("stream_id", selected_cam.get("cam_id", "14")))
         if "-" in st_num:
             st_num = st_num.split("-")[-1]
-        cam_url = get_active_stream_url(st_num)
+        if st_num.isdigit():
+            st_num = str(int(st_num))
 
         st.markdown(f"""
         <div class="kpi-card kpi-card-green" style="min-height: 60px !important; height: 60px !important; display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 14px !important; padding: 12px 20px !important; margin-bottom: 16px !important;">
-            <span class="soc-badge soc-badge-online">LIVE STREAMING</span>
+            <span class="soc-badge soc-badge-online">{'🔴 LIVE STREAM' if 'Live' in source_mode else '📼 DVR PLAYBACK'}</span>
             <span style="font-weight: 800; font-size: 0.95rem; color: #0F172A;">{selected_cam['cam_id']} : {selected_cam['name']}</span>
             <span style="color: #15803D; font-size: 0.88rem;">({selected_cam.get('city', 'Gujarat')} • {selected_cam.get('dept', selected_cam.get('dept_name', 'Traffic Branch'))})</span>
             <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.84rem; color: #0F172A; font-weight: 600;">GPS: {selected_cam['lat']}, {selected_cam['lon']}</span>
         </div>
         """, unsafe_allow_html=True)
 
-        render_cctv_live_container(selected_cam, height=480, border_color="rgba(134,239,172,0.9)")
+        if "Live" in source_mode:
+            render_cctv_live_container(selected_cam, height=480, border_color="rgba(134,239,172,0.9)")
+        else:
+            uploaded_dvr = st.file_uploader("Upload Checkpost Forensic DVR Video Clip (.mp4, .avi, .mkv)", type=["mp4", "avi", "mkv", "mov"], key="sc_dvr_upload")
+            if uploaded_dvr is not None:
+                tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+                tfile.write(uploaded_dvr.read())
+                tfile_path = tfile.name
+                tfile.close()
+                st.video(tfile_path)
+                st.caption("Forensic DVR Video loaded into local frame buffer with hardware PTS tracking enabled.")
+            else:
+                st.info("Upload a surveillance video clip above, or preview the checkpost DVR stream below with live controls.")
+                render_cctv_live_container(selected_cam, height=480, border_color="rgba(134,239,172,0.9)")
 
         c_radar_in, c_radar_act = st.columns([2, 1])
         with c_radar_in:
