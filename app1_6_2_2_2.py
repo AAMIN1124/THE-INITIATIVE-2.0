@@ -1543,7 +1543,7 @@ def probe_stream_connectivity(url, timeout_sec=2.0):
 
 import streamlit.components.v1 as components
 
-def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False):
+def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
     if isinstance(cam_obj, dict):
         cam_dict = cam_obj
         st_id = str(cam_dict.get("stream_id", "1"))
@@ -1559,7 +1559,56 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
     badge_html = f'''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;">🔴 LIVE • {cam_id_tag}</div>'''
 
     style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
-    full_html = f'''<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{{box-sizing:border-box;margin:0;padding:0;}}body{{background:transparent;overflow:hidden;}}</style></head><body><div style="position:relative;width:100%;height:{height}px;overflow:hidden;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);background:#000;"><video autoplay muted playsinline controls preload="metadata" loop onloadeddata="this.play();" src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;background:#000;{style_extra}"></video>{badge_html}</div></body></html>'''
+    full_html = f'''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{ background: transparent; overflow: hidden; }}
+    .vid-box {{ position: relative; width: 100%; height: {height}px; overflow: hidden; border-radius: 14px; border: 1.5px solid {border_color}; box-shadow: 0 6px 20px rgba(14,165,233,0.12); background: #000; }}
+    video {{ width: 100%; height: {height}px; object-fit: cover; border-radius: 14px; background: #000; {style_extra} }}
+</style>
+</head>
+<body>
+<div class="vid-box">
+    <video id="cctvVid" autoplay muted playsinline controls preload="none" loop oncanplay="this.play();" data-src="{video_src}"></video>
+    {badge_html}
+</div>
+<script>
+    (function() {{
+        var vid = document.getElementById('cctvVid');
+        var srcUrl = vid.getAttribute('data-src');
+        var delay = {stagger_ms};
+        
+        function startStream() {{
+            vid.src = srcUrl;
+            vid.load();
+            var p = vid.play();
+            if (p !== undefined) {{
+                p.catch(function() {{
+                    setTimeout(function() {{ vid.play(); }}, 250);
+                }});
+            }}
+        }}
+
+        if ('IntersectionObserver' in window) {{
+            var obs = new IntersectionObserver(function(entries) {{
+                entries.forEach(function(entry) {{
+                    if (entry.isIntersecting) {{
+                        setTimeout(startStream, delay);
+                        obs.disconnect();
+                    }}
+                }});
+            }}, {{ threshold: 0.1 }});
+            obs.observe(vid);
+        }} else {{
+            setTimeout(startStream, delay);
+        }}
+    }})();
+</script>
+</body>
+</html>'''
     try:
         components.html(full_html, height=height + 20)
     except Exception:
@@ -2520,8 +2569,16 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             <div class="osd-tag osd-tl">{selected_cam['cam_id']} • {selected_cam['name'].upper()}</div>
             <div class="osd-tag osd-tr">● LIVE REC • {selected_cam['city'].upper()}</div>
             <div class="live-badge">🔴 1080P HD STREAM ACTIVE</div>
-            <video id="vidPlayer" autoplay muted playsinline controls preload="metadata" loop onloadeddata="this.play();" src="{stream_mp4_url}" style="background:#000;"></video>
+            <video id="vidPlayer" autoplay muted playsinline controls preload="metadata" loop oncanplay="this.play();" src="{stream_mp4_url}" style="background:#000;"></video>
         </div>
+        <script>
+            (function() {{
+                var v = document.getElementById('vidPlayer');
+                v.play().catch(function() {{
+                    setTimeout(function() {{ v.play(); }}, 200);
+                }});
+            }})();
+        </script>
         </body>
         </html>
         """
@@ -2660,49 +2717,49 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     <span style="font-weight: 800; font-size: 0.85rem; color: #0F172A; margin-left: 8px;">{c_main['name']} ({c_main['city']})</span>
                 </div>
                 """, unsafe_allow_html=True)
-                render_cctv_live_container(c_main, height=460, border_color="rgba(134,239,172,0.9)", is_dual_main=True)
+                render_cctv_live_container(c_main, height=460, border_color="rgba(134,239,172,0.9)", is_dual_main=True, stagger_ms=0)
 
             with m_right:
                 r1_1, r1_2 = st.columns(2)
                 with r1_1:
                     c2 = cams_selected[1]
                     st.caption(f"**{c2['cam_id']}**: {c2['name'][:18]}")
-                    render_cctv_live_container(c2, height=200, border_color="rgba(186,230,253,0.8)")
+                    render_cctv_live_container(c2, height=200, border_color="rgba(186,230,253,0.8)", stagger_ms=150)
                 with r1_2:
                     c3 = cams_selected[2]
                     st.caption(f"**{c3['cam_id']}**: {c3['name'][:18]}")
-                    render_cctv_live_container(c3, height=200, border_color="rgba(186,230,253,0.8)")
+                    render_cctv_live_container(c3, height=200, border_color="rgba(186,230,253,0.8)", stagger_ms=300)
 
                 r2_1, r2_2 = st.columns(2)
                 with r2_1:
                     c4 = cams_selected[3]
                     st.caption(f"**{c4['cam_id']}**: {c4['name'][:18]}")
-                    render_cctv_live_container(c4, height=200, border_color="rgba(186,230,253,0.8)")
+                    render_cctv_live_container(c4, height=200, border_color="rgba(186,230,253,0.8)", stagger_ms=450)
                 with r2_2:
                     c5 = cams_selected[4]
                     st.caption(f"**{c5['cam_id']}**: {c5['name'][:18]}")
-                    render_cctv_live_container(c5, height=200, border_color="rgba(186,230,253,0.8)")
+                    render_cctv_live_container(c5, height=200, border_color="rgba(186,230,253,0.8)", stagger_ms=600)
         
         else:
             g1, g2, g3 = st.columns(3)
             with g1:
                 c1 = cams_selected[0]; st.markdown(f"**{c1['cam_id']} — {c1['name']}**")
-                render_cctv_live_container(c1, height=220, border_color="rgba(134,239,172,0.8)")
+                render_cctv_live_container(c1, height=220, border_color="rgba(134,239,172,0.8)", stagger_ms=0)
             with g2:
                 c2 = cams_selected[1]; st.markdown(f"**{c2['cam_id']} — {c2['name']}**")
-                render_cctv_live_container(c2, height=220, border_color="rgba(134,239,172,0.8)")
+                render_cctv_live_container(c2, height=220, border_color="rgba(134,239,172,0.8)", stagger_ms=150)
             with g3:
                 c3 = cams_selected[2]; st.markdown(f"**{c3['cam_id']} — {c3['name']}**")
-                render_cctv_live_container(c3, height=220, border_color="rgba(134,239,172,0.8)")
+                render_cctv_live_container(c3, height=220, border_color="rgba(134,239,172,0.8)", stagger_ms=300)
 
             st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
             g4, g5, g6 = st.columns(3)
             with g4:
                 c4 = cams_selected[3]; st.markdown(f"**{c4['cam_id']} — {c4['name']}**")
-                render_cctv_live_container(c4, height=220, border_color="rgba(134,239,172,0.8)")
+                render_cctv_live_container(c4, height=220, border_color="rgba(134,239,172,0.8)", stagger_ms=450)
             with g5:
                 c5 = cams_selected[4]; st.markdown(f"**{c5['cam_id']} — {c5['name']}**")
-                render_cctv_live_container(c5, height=220, border_color="rgba(134,239,172,0.8)")
+                render_cctv_live_container(c5, height=220, border_color="rgba(134,239,172,0.8)", stagger_ms=600)
             with g6:
                 st.markdown(f"**COMMAND STATUS & TELEMETRY**")
                 st.markdown(f"""
