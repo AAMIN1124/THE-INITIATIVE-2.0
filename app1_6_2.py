@@ -1180,28 +1180,47 @@ def render_metric_card(label, value, subtext="", color="blue"):
     </div>
     """, unsafe_allow_html=True)
 
-# ----------------- AUTHENTICATION GATEWAY -----------------
+# ----------------- SPLIT-SCREEN AUTHENTICATION GATEWAY -----------------
 if not st.session_state.authenticated:
     st.markdown("""
-    <div class="login-box">
-        <div style="font-size: 0.75rem; font-weight: 800; color: #0284C7; letter-spacing: 2px; text-transform: uppercase;">
-            Gujarat Police • State Crime Record Bureau
+    <div style="max-width: 960px; margin: 40px auto 20px auto; border-radius: 24px; overflow: hidden; border: 1.5px solid rgba(186, 230, 253, 0.95); box-shadow: 0 25px 60px rgba(14, 165, 233, 0.15); display: flex; flex-wrap: wrap; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(32px) saturate(200%); -webkit-backdrop-filter: blur(32px);">
+        <!-- Split Left: Clean Command Form Header -->
+        <div style="flex: 1 1 480px; padding: 42px 46px; display: flex; flex-direction: column; justify-content: center; background: rgba(255, 255, 255, 0.9);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="background: #E0F2FE; color: #0369A1; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace;">GUJARAT POLICE • SCRB</span>
+                <span style="background: #DCFCE7; color: #166534; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.5px;">SECURE SSL/TLS</span>
+            </div>
+            <h2 style="font-size: 1.75rem; font-weight: 900; color: #0F172A; margin: 6px 0 4px 0; letter-spacing: -0.03em;">
+                Command Gateway
+            </h2>
+            <p style="font-size: 0.88rem; color: #475569; margin: 0 0 10px 0; line-height: 1.4;">
+                State Crime Record Bureau • Law Enforcement Intelligence Terminal
+            </p>
         </div>
-        <h2 style="font-size: 1.6rem; font-weight: 900; color: #0F172A; margin-top: 4px; margin-bottom: 8px;">
-            Law Enforcement Command Terminal
-        </h2>
-        <div style="font-size: 0.88rem; color: #475569; margin-bottom: 24px;">
-            Restricted state intelligence terminal for authorized police personnel.
+        <!-- Split Right: Royal Blue Police Insignia Panel -->
+        <div style="flex: 1 1 380px; background: linear-gradient(135deg, #0F172A 0%, #0369A1 50%, #0284C7 100%); padding: 42px 40px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; color: #FFFFFF; position: relative; overflow: hidden;">
+            <div style="position: absolute; right: -30px; bottom: -30px; opacity: 0.12; font-size: 15rem; font-weight: 900; user-select: none;">🛡️</div>
+            <div style="font-size: 2.4rem; margin-bottom: 12px;">🛡️</div>
+            <div style="font-size: 0.76rem; font-weight: 800; color: #38BDF8; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; font-family: 'JetBrains Mono', monospace;">STATE POLICE COMMAND</div>
+            <h3 style="font-size: 1.55rem; font-weight: 900; color: #FFFFFF; margin: 0 0 10px 0; line-height: 1.25;">
+                Secure Access.<br>Stronger Gujarat.
+            </h3>
+            <p style="font-size: 0.84rem; color: #E0F2FE; line-height: 1.5; margin: 0 0 20px 0; max-width: 320px;">
+                Automated ANPR surveillance, cross-camera suspect tracking, and Section 65B forensic attestation grid.
+            </p>
+            <div style="background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 12px; padding: 8px 14px; font-size: 0.75rem; font-weight: 700; color: #FFFFFF; font-family: 'JetBrains Mono', monospace;">
+                🔒 256-BIT ENCLAVE • LEVEL-4 CLEARANCE
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    c_left, c_mid, c_right = st.columns([1, 1.2, 1])
-    with c_mid:
-        login_user = st.text_input("Officer Badge ID / Username", value="", placeholder="e.g. AAMIN")
-        login_pass = st.text_input("Security PIN / Password", type="password", placeholder="Enter Security Password")
+    c_left, c_form, c_right = st.columns([1, 1.4, 1])
+    with c_form:
+        login_user = st.text_input("Officer Badge ID / Username", value="", placeholder="e.g. AAMIN", key="auth_badge_id")
+        login_pass = st.text_input("Security PIN / Password", type="password", placeholder="Enter Security Password", key="auth_pin")
 
-        if st.button("AUTHENTICATE & OPEN TERMINAL", type="primary", use_container_width=True):
+        if st.button("AUTHENTICATE & ENTER TERMINAL", type="primary", use_container_width=True):
             if login_user.strip().upper() == "AAMIN" and login_pass.strip() == "1124":
                 st.session_state.authenticated = True
                 st.session_state.officer_profile["name"] = "Officer Aamin"
