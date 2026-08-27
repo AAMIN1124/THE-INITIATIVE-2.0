@@ -1498,11 +1498,15 @@ def is_domain_resolvable(url, timeout_sec=0.4):
 # ----------------- 100% GENUINE LIVE CCTV STREAM RENDERING ENGINE -----------------
 def get_active_stream_url(identifier):
     if isinstance(identifier, dict):
-        st_id = str(identifier.get("stream_id", "1"))
+        st_id = str(identifier.get("stream_id", identifier.get("cam_id", identifier.get("camera_id", "1"))))
+        if "-" in st_id:
+            st_id = st_id.split("-")[-1]
         if identifier.get("custom_url"):
             return identifier["custom_url"].strip()
     else:
-        st_id = str(identifier)
+        st_id = str(identifier).strip()
+        if "-" in st_id:
+            st_id = st_id.split("-")[-1]
         
     overrides = st.session_state.get("stream_overrides", {})
     if st_id in overrides and overrides[st_id].strip():
@@ -2538,6 +2542,11 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             "Forensic Edge & Plate Enhancer": "filter: contrast(180%) grayscale(100%) brightness(110%);"
         }
         active_video_filter = filter_css_map.get(filter_mode, filter_css_map["Standard HD (Optimized)"])
+
+        st_num = str(selected_cam.get("stream_id", selected_cam.get("cam_id", "1")))
+        if "-" in st_num:
+            st_num = st_num.split("-")[-1]
+        cam_url = get_active_stream_url(st_num)
 
         st.markdown(f"""
         <div class="kpi-card kpi-card-green" style="min-height: 60px !important; height: 60px !important; display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 14px !important; padding: 12px 20px !important; margin-bottom: 16px !important;">
