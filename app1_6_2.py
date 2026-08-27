@@ -1572,13 +1572,15 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 </head>
 <body>
 <div class="vid-box">
-    <video id="cctvVid" autoplay muted playsinline controls preload="metadata" loop src="{video_src}"></video>
+    <video id="cctvVid" autoplay muted playsinline controls preload="none" loop></video>
     {badge_html}
 </div>
 <script>
     (function() {{
         var v = document.getElementById('cctvVid');
-        var delay = {stagger_ms};
+        var streamUrl = "{video_src}";
+        var baseDelay = {stagger_ms};
+        var jitter = Math.random() * 250;
 
         function cleanSocket() {{
             try {{
@@ -1602,17 +1604,19 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             }}, 800);
         }};
 
-        setTimeout(function() {{
+        function initStream() {{
             try {{
-                v.load();
+                v.src = streamUrl;
                 var p = v.play();
                 if (p !== undefined) {{
                     p.catch(function() {{
-                        setTimeout(function() {{ v.play().catch(function(){{}}); }}, 200);
+                        setTimeout(function() {{ v.play().catch(function(){{}}); }}, 150);
                     }});
                 }}
             }} catch(e) {{}}
-        }}, delay);
+        }}
+
+        setTimeout(initStream, baseDelay + jitter);
     }})();
 </script>
 </body>
