@@ -5,7 +5,7 @@ import warnings
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
 os.environ["OPENCV_LOG_LEVEL"] = "OFF"
 os.environ["AV_LOG_FORCE_NOCOLOR"] = "1"
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;2000"
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
 warnings.filterwarnings("ignore")
 
 import socket
@@ -1647,7 +1647,7 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
         try:
             # Force RTSP over TCP
             if stream_url.startswith(("rtsp://", "rtsps://")):
-                os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;2000"
+                os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
 
             cap = cv2.VideoCapture(stream_url)
             if not cap.isOpened():
