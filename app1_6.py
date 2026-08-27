@@ -1535,21 +1535,21 @@ def probe_stream_connectivity(url, timeout_sec=2.0):
                 pass
     return False
 
+import streamlit.components.v1 as components
+
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False):
     if isinstance(cam_obj, dict):
         st_id = str(cam_obj.get("stream_id", "1"))
     else:
         st_id = str(cam_obj)
     
-    live_url = get_active_stream_url(cam_obj)
-    slot_rand = int(time.time() * 1000) % 10000
-    video_src = f"{live_url}?slot={st_id}_{slot_rand}" if "?" not in live_url else f"{live_url}&slot={st_id}_{slot_rand}"
+    video_src = get_active_stream_url(cam_obj)
     badge_html = '''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.9);color:#FFFFFF;padding:3px 9px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;">🔴 LIVE FEED</div>'''
 
     style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
-    full_html = f'''<div style="position:relative;overflow:hidden;border-radius:14px;margin-bottom:12px;"><video autoplay muted playsinline preload="auto" loop onloadedmetadata="this.play();" src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);{style_extra}"></video>{badge_html}</div>'''
+    full_html = f'''<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{{box-sizing:border-box;margin:0;padding:0;}}body{{background:transparent;overflow:hidden;}}</style></head><body><div style="position:relative;width:100%;height:{height}px;overflow:hidden;border-radius:14px;border:1.5px solid {border_color};box-shadow:0 6px 20px rgba(14,165,233,0.12);background:#000;"><video autoplay muted playsinline controls preload="auto" loop onloadedmetadata="this.play();" src="{video_src}" style="width:100%;height:{height}px;object-fit:cover;border-radius:14px;background:#000;{style_extra}"></video>{badge_html}</div></body></html>'''
     try:
-        st.html(full_html)
+        components.html(full_html, height=height + 20)
     except Exception:
         st.markdown(full_html, unsafe_allow_html=True)
 
@@ -2422,8 +2422,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: #15803D;">● 30 FPS</span>
                 </div>
                 """, unsafe_allow_html=True)
-                html_a = f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(cam_a)}" style="width:100%;height:270px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(134,239,172,0.9);box-shadow:0 6px 20px rgba(34,197,94,0.12);"></video></body></html>"""
-                st.html(html_a)
+                render_cctv_live_container(cam_a, height=270, border_color="rgba(134,239,172,0.9)")
 
             if i + 1 < len(VERIFIED_WORKING_CAMERAS):
                 cam_b = VERIFIED_WORKING_CAMERAS[i+1]
@@ -2435,8 +2434,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                         <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: #0369A1;">● 30 FPS</span>
                     </div>
                     """, unsafe_allow_html=True)
-                    html_b = f"""<!DOCTYPE html><html><body style="margin:0;background:transparent;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(cam_b)}" style="width:100%;height:270px;object-fit:cover;border-radius:14px;border:1.5px solid rgba(186,230,253,0.9);box-shadow:0 6px 20px rgba(14,165,233,0.12);"></video></body></html>"""
-                    st.html(html_b)
+                    render_cctv_live_container(cam_b, height=270, border_color="rgba(186,230,253,0.9)")
 
     elif cctv_mode == "1. Single Camera Stream & Optical HUD Filters":
         f_col1, f_col2, f_col3 = st.columns([1.5, 1, 1])
@@ -2468,9 +2466,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         }
         active_video_filter = filter_css_map.get(filter_mode, filter_css_map["Standard HD (Optimized)"])
         st_num = selected_cam["stream_id"]
-        slot_rand_single = int(time.time() * 1000) % 10000
-        live_raw = get_active_stream_url(st_num)
-        stream_mp4_url = f"{live_raw}?slot={st_num}_{slot_rand_single}" if "?" not in live_raw else f"{live_raw}&slot={st_num}_{slot_rand_single}"
+        stream_mp4_url = get_active_stream_url(st_num)
 
         st.markdown(f"""
         <div class="kpi-card kpi-card-green" style="min-height: 60px !important; height: 60px !important; display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 14px !important; padding: 12px 20px !important; margin-bottom: 16px !important;">
@@ -2488,12 +2484,13 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         <meta charset="utf-8">
         <style>
             * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-            body {{ background: transparent; color: #000000; font-family: 'Inter', sans-serif; }}
-            .container {{ position: relative; width: 100%; max-width: 960px; height: 500px; background: #000; border: 1.5px solid rgba(134, 239, 172, 0.8); border-radius: 18px; overflow: hidden; box-shadow: 0 12px 35px rgba(34, 197, 94, 0.18); }}
+            body {{ background: transparent; color: #000000; font-family: 'Inter', sans-serif; overflow: hidden; }}
+            .container {{ position: relative; width: 100%; height: 500px; background: #000; border: 1.5px solid rgba(134, 239, 172, 0.8); border-radius: 18px; overflow: hidden; box-shadow: 0 12px 35px rgba(34, 197, 94, 0.18); }}
             video {{
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
+                background: #000;
                 image-rendering: -webkit-optimize-contrast;
                 image-rendering: crisp-edges;
                 {active_video_filter}
@@ -2511,13 +2508,13 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             <div class="osd-tag osd-tl">{selected_cam['cam_id']} • {selected_cam['name'].upper()}</div>
             <div class="osd-tag osd-tr">● LIVE REC • {selected_cam['city'].upper()}</div>
             <div class="live-badge">🔴 1080P HD STREAM ACTIVE</div>
-            <video id="vidPlayer" autoplay muted playsinline controls preload="auto" loop onloadedmetadata="this.play();" src="{stream_mp4_url}"></video>
+            <video id="vidPlayer" autoplay muted playsinline controls preload="auto" loop onloadedmetadata="this.play();" src="{stream_mp4_url}" style="background:#000;"></video>
         </div>
         </body>
         </html>
         """
         try:
-            st.html(interactive_player_html)
+            components.html(interactive_player_html, height=525)
         except Exception:
             st.markdown(interactive_player_html, unsafe_allow_html=True)
 
@@ -2651,8 +2648,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     <span style="font-weight: 800; font-size: 0.85rem; color: #0F172A; margin-left: 8px;">{c_main['name']} ({c_main['city']})</span>
                 </div>
                 """, unsafe_allow_html=True)
-                master_vid_html = f"""<!DOCTYPE html><html><body style="background:transparent;margin:0;overflow:hidden;"><video autoplay muted playsinline controls loop src="{get_active_stream_url(c_main)}" style="width:100%;height:460px;object-fit:cover;border-radius:16px;border:1.5px solid rgba(134,239,172,0.9);box-shadow:0 8px 28px rgba(34,197,94,0.16);"></video></body></html>"""
-                st.html(master_vid_html)
+                render_cctv_live_container(c_main, height=460, border_color="rgba(134,239,172,0.9)", is_dual_main=True)
 
             with m_right:
                 r1_1, r1_2 = st.columns(2)
