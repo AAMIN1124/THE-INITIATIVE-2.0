@@ -1791,11 +1791,10 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             {"stream_id": st_id, "cam_id": f"CAM-{int(st_id):02d}" if st_id.isdigit() else st_id, "name": f"Camera {st_id}", "city": "Gujarat", "dept": "Traffic Branch", "status": "ONLINE"}
         )
     
-    # Strictly normalize ID for the exact selected camera
     if "-" in st_id:
         st_id = st_id.split("-")[-1]
     if st_id.isdigit():
-        st_id = str(int(st_id)) # strip leading zero: '01' -> '1', '14' -> '14'
+        st_id = str(int(st_id))
     
     video_src = get_active_stream_url(cam_dict)
     cam_id_tag = cam_dict.get("cam_id", f"CAM-{int(st_id):02d}" if st_id.isdigit() else st_id)
@@ -1807,7 +1806,6 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 <html>
 <head>
 <meta charset="utf-8">
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{ background: transparent; overflow: hidden; }}
@@ -1817,59 +1815,24 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 </head>
 <body>
 <div class="vid-box">
-    <video id="cctvVid" autoplay muted playsinline controls preload="metadata" loop></video>
+    <video id="cctvVid" autoplay muted playsinline controls preload="auto" loop src="{video_src}"></video>
     {badge_html}
 </div>
 <script>
     (function() {{
         var v = document.getElementById('cctvVid');
-        var streamUrl = "{video_src}";
         var delay = {stagger_ms};
 
-        function cleanSocket() {{
+        function startVideo() {{
             try {{
-                v.pause();
-                v.removeAttribute('src');
-                v.src = "";
-                v.load();
+                var p = v.play();
+                if (p !== undefined) {{
+                    p.catch(function() {{
+                        v.muted = true;
+                        v.play().catch(function(){{}});
+                    }});
+                }}
             }} catch(e) {{}}
-        }}
-
-        window.addEventListener('beforeunload', cleanSocket);
-        window.addEventListener('unload', cleanSocket);
-        window.addEventListener('pagehide', cleanSocket);
-
-                function playStream() {{
-            if (Hls.isSupported()) {{
-                var hls = new Hls({{
-                    maxBufferLength: 5,
-                    enableWorker: true,
-                    lowLatencyMode: true
-                }});
-                hls.loadSource(streamUrl);
-                hls.attachMedia(v);
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {{
-                    v.play().catch(function(){{}});
-                }});
-                hls.on(Hls.Events.ERROR, function(event, data) {{
-                    if (data.fatal) {{
-                        try {{
-                            hls.destroy();
-                            v.src = streamUrl;
-                            v.load();
-                            v.play().catch(function(){{}});
-                        }} catch(e) {{}}
-                    }}
-                }});
-            }} else if (v.canPlayType('application/vnd.apple.mpegurl')) {{
-                v.src = streamUrl;
-                v.load();
-                v.play().catch(function(){{}});
-            }} else {{
-                v.src = streamUrl;
-                v.load();
-                v.play().catch(function(){{}});
-            }}
         }}
 
         v.onerror = function() {{
@@ -1878,10 +1841,14 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
                     v.load();
                     v.play().catch(function(){{}});
                 }} catch(e) {{}}
-            }}, 1000);
+            }}, 1500);
         }};
 
-        setTimeout(playStream, delay);
+        if (delay > 0) {{
+            setTimeout(startVideo, delay);
+        }} else {{
+            startVideo();
+        }}
     }})();
 </script>
 </body>
