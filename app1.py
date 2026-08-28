@@ -1185,156 +1185,76 @@ st.markdown("""
         color: #0F172A !important;
     }
 
-    .stTextInput input, 
-    .stSelectbox div[data-baseweb="select"] *, 
-    .stMultiSelect div[data-baseweb="select"] *,
-    textarea,
-    div[data-baseweb="input"] input {
-        background: rgba(240, 249, 255, 0.75) !important;
-        backdrop-filter: blur(20px) saturate(190%) !important;
-        -webkit-backdrop-filter: blur(20px) saturate(190%) !important;
+        /* ========================================================================= */
+    /* THEME-ISOLATED INPUT BOXES (PROTECTED FROM PURE BLACK DARK MODE)         */
+    /* ========================================================================= */
+    div[data-baseweb="input"],
+    div[data-baseweb="base-input"],
+    div[data-baseweb="select"],
+    div[data-baseweb="select"] > div,
+    .stTextInput input,
+    .stNumberInput input,
+    .stDateInput input,
+    .stSelectbox div[data-baseweb="select"],
+    .stMultiSelect div[data-baseweb="select"],
+    textarea {
+        background: #FFFFFF !important;
+        background-color: #FFFFFF !important;
         color: #0F172A !important;
         -webkit-text-fill-color: #0F172A !important;
-        border: 1px solid rgba(186, 230, 253, 0.9) !important;
-        border-radius: 14px !important;
+        border: 1.5px solid rgba(186, 230, 253, 0.95) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 2px 8px rgba(14, 165, 233, 0.04) !important;
         font-size: 0.92rem !important;
-        box-shadow: 0 4px 16px rgba(14, 165, 233, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
     }
 
-    .stTextInput input:focus, textarea:focus {
-        background: rgba(240, 249, 255, 0.95) !important;
-        border-color: #0284C7 !important;
-        box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+    .stTextInput input::placeholder,
+    textarea::placeholder {
+        color: #94A3B8 !important;
+        -webkit-text-fill-color: #94A3B8 !important;
     }
 
-    div[data-baseweb="popover"], div[data-baseweb="popover"] * {
+    .stTextInput input:focus,
+    textarea:focus,
+    div[data-baseweb="input"]:focus-within {
         background: #FFFFFF !important;
-        color: #0F172A !important;
+        background-color: #FFFFFF !important;
+        border-color: #0284C7 !important;
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.22) !important;
     }
-    div[data-baseweb="popover"] li[role="option"] {
+
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] *,
+    div[data-baseweb="menu"],
+    div[data-baseweb="menu"] * {
+        background-color: #FFFFFF !important;
         color: #0F172A !important;
+        -webkit-text-fill-color: #0F172A !important;
     }
-    div[data-baseweb="popover"] li[role="option"]:hover {
-        background: #E0F2FE !important;
+    div[data-baseweb="popover"] li[role="option"]:hover,
+    div[data-baseweb="menu"] li[role="option"]:hover {
+        background-color: #E0F2FE !important;
         color: #0369A1 !important;
-    }
-
-    div[data-testid="stFileUploadDropzone"] {
-        background: radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.16) 0px, transparent 60%),
-                    linear-gradient(135deg, rgba(240, 249, 255, 0.6) 0%, rgba(224, 242, 254, 0.45) 100%) !important;
-        backdrop-filter: blur(24px) saturate(180%) !important;
-        -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-        border: 2px dashed rgba(2, 132, 199, 0.35) !important;
-        border-radius: 18px !important;
-        box-shadow: 0 8px 25px rgba(14, 165, 233, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-    }
-    div[data-testid="stFileUploadDropzone"] * {
-        color: #0F172A !important;
-    }
-
-    div[data-testid="stDataFrame"] {
-        border: 1px solid rgba(186, 230, 253, 0.9) !important;
-        border-radius: 18px !important;
-        background: rgba(255, 255, 255, 0.85) !important;
-        backdrop-filter: blur(24px) saturate(180%) !important;
-        -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-        overflow: hidden !important;
-        box-shadow: 0 10px 30px rgba(14, 165, 233, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-    }
-    div[data-testid="stDataFrame"] * {
-        color: #0F172A !important;
-    }
-
-    .login-box {
-        max-width: 500px;
-        margin: 60px auto;
-        padding: 38px 42px;
-        background: radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.25) 0px, transparent 55%),
-                    radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.2) 0px, transparent 50%),
-                    linear-gradient(135deg, rgba(240, 249, 255, 0.85) 0%, rgba(224, 242, 254, 0.65) 100%) !important;
-        backdrop-filter: blur(32px) saturate(220%) !important;
-        -webkit-backdrop-filter: blur(32px) saturate(220%) !important;
-        border: 1px solid rgba(186, 230, 253, 0.95) !important;
-        border-radius: 22px !important;
-        box-shadow: 0 20px 50px rgba(14, 165, 233, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.95) !important;
-    }
-    .login-box * {
-        color: #0F172A !important;
-    }
-
-    .profile-hero-card {
-        background: radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.25) 0px, transparent 55%),
-                    radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.2) 0px, transparent 50%),
-                    linear-gradient(135deg, rgba(240, 249, 255, 0.8) 0%, rgba(224, 242, 254, 0.6) 100%) !important;
-        backdrop-filter: blur(28px) saturate(200%) !important;
-        -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
-        border: 1px solid rgba(186, 230, 253, 0.95) !important;
-        border-radius: 20px !important;
-        padding: 26px !important;
-        margin-bottom: 20px !important;
-        box-shadow: 0 10px 32px rgba(14, 165, 233, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.95) !important;
-    }
-    .profile-hero-card * {
-        color: #0F172A !important;
-    }
-
-    .stButton > button[kind="primary"], .stButton > button {
-        background: #000000 !important;
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-        font-size: 0.9rem !important;
-        letter-spacing: 0.4px !important;
-        border: 1px solid #000000 !important;
-        border-radius: 12px !important;
-        padding: 10px 24px !important;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
-        transition: all 0.2s ease !important;
-    }
-
-    .stButton > button * {
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }
-
-    .stButton > button:hover {
-        background: #1E293B !important;
-        border-color: #1E293B !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16) !important;
-    }
-
-    .stLinkButton > a {
-        background: rgba(240, 249, 255, 0.75) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        color: #0369A1 !important;
-        border: 1px solid rgba(2, 132, 199, 0.6) !important;
-        font-weight: 700 !important;
-        border-radius: 12px !important;
-        font-size: 0.88rem !important;
-        box-shadow: 0 4px 14px rgba(14, 165, 233, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-        transition: all 0.2s ease !important;
-    }
-
-    .stLinkButton > a:hover {
-        background: #0284C7 !important;
-        color: #FFFFFF !important;
+        -webkit-text-fill-color: #0369A1 !important;
     }
 
     /* ========================================================================= */
-    /* JET BLACK SIDEBAR (ISOLATED IMMUTABLE DARK MODE)                           */
+    /* GLASS BLUE SIDEBAR (DEEP FROSTED ROYAL NAVY GLASS)                       */
     /* ========================================================================= */
     section[data-testid="stSidebar"],
     section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
     section[data-testid="stSidebar"][data-theme="dark"],
     section[data-testid="stSidebar"][data-theme="light"] {
-        background-color: #000000 !important;
-        border-right: 1px solid #1E293B !important;
+        background: linear-gradient(180deg, rgba(7, 20, 48, 0.96) 0%, rgba(12, 35, 78, 0.94) 50%, rgba(5, 15, 38, 0.98) 100%) !important;
+        backdrop-filter: blur(25px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(25px) saturate(180%) !important;
+        border-right: 1px solid rgba(56, 189, 248, 0.25) !important;
+        box-shadow: 4px 0 24px rgba(2, 132, 199, 0.15) !important;
     }
 
     section[data-testid="stSidebar"] * {
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
+        color: #F1F5F9 !important;
+        -webkit-text-fill-color: #F1F5F9 !important;
     }
 
     section[data-testid="stSidebar"] h1, 
@@ -1342,6 +1262,7 @@ st.markdown("""
     section[data-testid="stSidebar"] h3, 
     section[data-testid="stSidebar"] h4 {
         color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
         font-weight: 800 !important;
     }
 
@@ -1355,10 +1276,11 @@ st.markdown("""
         text-shadow: 0 0 14px rgba(0, 229, 255, 0.45) !important;
     }
 
+    /* Glass Blue Radio Buttons */
     section[data-testid="stSidebar"] div[role="radiogroup"] {
         display: flex !important;
         flex-direction: column !important;
-        gap: 8px !important;
+        gap: 7px !important;
         margin-top: 10px !important;
         margin-bottom: 15px !important;
         width: 100% !important;
@@ -1368,11 +1290,13 @@ st.markdown("""
         display: flex !important;
         align-items: center !important;
         width: 100% !important;
-        min-height: 48px !important;
-        height: 48px !important;
-        background: #000000 !important;
-        border: 1px solid #222F3E !important;
-        border-radius: 8px !important;
+        min-height: 44px !important;
+        height: 44px !important;
+        background: rgba(12, 28, 64, 0.6) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(56, 189, 248, 0.2) !important;
+        border-radius: 12px !important;
         padding: 0 14px !important;
         margin: 0 !important;
         box-sizing: border-box !important;
@@ -1381,15 +1305,16 @@ st.markdown("""
     }
 
     section[data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
-        background: #111827 !important;
+        background: rgba(18, 42, 92, 0.8) !important;
         border-color: #00E5FF !important;
+        box-shadow: 0 0 12px rgba(0, 229, 255, 0.2) !important;
     }
 
     section[data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"],
     section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
-        background: #0F172A !important;
-        border-color: #00E5FF !important;
-        box-shadow: 0 0 12px rgba(0, 229, 255, 0.25) !important;
+        background: linear-gradient(90deg, rgba(2, 132, 199, 0.45) 0%, rgba(14, 34, 74, 0.85) 100%) !important;
+        border: 1.5px solid #00E5FF !important;
+        box-shadow: 0 0 16px rgba(0, 229, 255, 0.35) !important;
     }
 
     section[data-testid="stSidebar"] div[role="radiogroup"] > label span,
@@ -1397,56 +1322,79 @@ st.markdown("""
     section[data-testid="stSidebar"] div[role="radiogroup"] > label div {
         font-size: 0.88rem !important;
         font-weight: 700 !important;
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
+        color: #F1F5F9 !important;
+        -webkit-text-fill-color: #F1F5F9 !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
+    }
+
+    section[data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] span,
+    section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) span {
+        color: #00E5FF !important;
+        -webkit-text-fill-color: #00E5FF !important;
+        font-weight: 800 !important;
     }
 
     .sidebar-profile-card {
         display: flex;
         align-items: center;
         gap: 12px;
-        background: #000000 !important;
-        border: 1px solid #222F3E !important;
-        border-radius: 10px !important;
+        background: rgba(14, 34, 74, 0.65) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(56, 189, 248, 0.35) !important;
+        border-radius: 14px !important;
         padding: 12px 14px !important;
         margin-bottom: 16px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
     }
 
     .sidebar-profile-card * {
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
+        color: #F1F5F9 !important;
+        -webkit-text-fill-color: #F1F5F9 !important;
     }
 
     .sidebar-avatar {
-        width: 44px;
-        height: 44px;
+        width: 46px;
+        height: 46px;
         border-radius: 50%;
-        background: #0F172A !important;
+        background: #0B1938 !important;
         border: 2px solid #00E5FF !important;
+        box-shadow: 0 0 14px rgba(0, 229, 255, 0.45) !important;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.2rem;
-        font-weight: 800;
+        font-size: 1.15rem;
+        font-weight: 900;
         color: #00E5FF !important;
+        -webkit-text-fill-color: #00E5FF !important;
         overflow: hidden;
         flex-shrink: 0;
     }
 
     section[data-testid="stSidebar"] .stButton > button {
-        background: #000000 !important;
-        color: #FFFFFF !important;
-        border: 1px solid #222F3E !important;
-        border-radius: 8px !important;
+        background: rgba(12, 28, 64, 0.7) !important;
+        color: #F1F5F9 !important;
+        -webkit-text-fill-color: #F1F5F9 !important;
+        border: 1px solid rgba(56, 189, 248, 0.3) !important;
+        border-radius: 10px !important;
         margin-top: 10px !important;
+        transition: all 0.2s ease !important;
     }
 
     section[data-testid="stSidebar"] .stButton > button:hover {
-        background: #1E293B !important;
+        background: rgba(18, 42, 92, 0.9) !important;
         border-color: #00E5FF !important;
+        box-shadow: 0 0 12px rgba(0, 229, 255, 0.25) !important;
+    }
+
+    section[data-testid="stSidebar"] .stTextInput input,
+    section[data-testid="stSidebar"] div[data-baseweb="input"] input {
+        background: rgba(10, 24, 54, 0.85) !important;
+        border: 1px solid rgba(56, 189, 248, 0.35) !important;
+        color: #F1F5F9 !important;
+        -webkit-text-fill-color: #F1F5F9 !important;
     }
 </style>
 """, unsafe_allow_html=True)
