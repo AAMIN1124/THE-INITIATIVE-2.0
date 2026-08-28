@@ -1760,75 +1760,49 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         st_id = st_id.split("-")[-1]
     clean_id = str(int(st_id)) if st_id.isdigit() else st_id
     
-    primary_url = get_active_stream_url(cam_dict)
-    fallback_url_1 = f"https://live.corp8.cloud/live/stream/{clean_id}/"
-    fallback_url_2 = f"https://live.corp8.cloud/stream/14" # Guaranteed working mesh node
-    
+    video_src = get_active_stream_url(cam_dict)
     cam_id_tag = cam_dict.get("cam_id", f"CAM-{int(clean_id):02d}" if clean_id.isdigit() else clean_id)
-    badge_html = f'<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:monospace;">🔴 LIVE • {cam_id_tag}</div>'
-    
-    style_extra = "image-rendering: crisp-edges; filter: contrast(115%) brightness(98%);" if is_dual_main else ""
-    mount_token = f"mount_{clean_id}_{int(time.time() * 1000) % 100000}"
+    badge_html = f'''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:monospace;">🔴 LIVE • {cam_id_tag}</div>'''
 
+    style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
+    dom_id = f"vid_feed_{clean_id}"
+    
     full_html = f'''<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<!-- token: {mount_token} -->
 <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-    body {{ background: transparent; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }}
-    .vid-box {{ position: relative; width: 100%; height: {height}px; overflow: hidden; border-radius: 14px; border: 1.5px solid {border_color}; box-shadow: 0 6px 20px rgba(14,165,233,0.12); background: #050B14; }}
+    body {{ background: transparent; overflow: hidden; }}
+    .vid-box {{ position: relative; width: 100%; height: {height}px; overflow: hidden; border-radius: 14px; border: 1.5px solid {border_color}; box-shadow: 0 6px 20px rgba(14,165,233,0.12); background: #000; }}
     video {{ width: 100%; height: {height}px; object-fit: cover; border-radius: 14px; background: #000; {style_extra} }}
-    .status-bar {{ position: absolute; bottom: 8px; right: 12px; font-size: 0.72rem; color: #38BDF8; font-family: monospace; font-weight: bold; background: rgba(15,23,42,0.75); padding: 2px 8px; border-radius: 4px; pointer-events: none; }}
 </style>
 </head>
 <body>
 <div class="vid-box">
-    <video id="{mount_token}" autoplay muted playsinline controls preload="auto" loop></video>
+    <video id="{dom_id}" autoplay muted playsinline controls preload="auto" loop src="{video_src}"></video>
     {badge_html}
-    <div class="status-bar" id="sb_{mount_token}">LIVE 30 FPS</div>
 </div>
 <script>
     (function() {{
-        var v = document.getElementById("{mount_token}");
-        var sb = document.getElementById("sb_{mount_token}");
-        var sources = ["{primary_url}", "{fallback_url_1}", "{fallback_url_2}"];
-        var curIdx = 0;
-        var hasPlayed = false;
-
-        function loadSource(idx) {{
-            if (idx >= sources.length) return;
-            v.src = sources[idx];
-            v.load();
-            var p = v.play();
-            if (p !== undefined) {{
-                p.then(function() {{
-                    hasPlayed = true;
-                    sb.innerText = "STREAM ONLINE";
-                }}).catch(function(e) {{
-                    v.muted = true;
-                    v.play().catch(function(){{}});
-                }});
-            }}
+        var v = document.getElementById('{dom_id}');
+        var delay = {stagger_ms};
+        function start() {{
+            try {{
+                v.muted = true;
+                var p = v.play();
+                if (p !== undefined) {{
+                    p.catch(function() {{
+                        setTimeout(function() {{ v.play().catch(function(){{}}); }}, 200);
+                    }});
+                }}
+            }} catch(e) {{}}
         }}
-
-        v.addEventListener('error', function() {{
-            if (!hasPlayed && curIdx < sources.length - 1) {{
-                curIdx++;
-                sb.innerText = "FAILOVER SYNC...";
-                setTimeout(function() {{ loadSource(curIdx); }}, 500);
-            }}
-        }});
-
-        v.addEventListener('stalled', function() {{
-            if (!hasPlayed && curIdx < sources.length - 1) {{
-                curIdx++;
-                setTimeout(function() {{ loadSource(curIdx); }}, 800);
-            }}
-        }});
-
-        setTimeout(function() {{ loadSource(0); }}, {stagger_ms});
+        if (delay > 0) {{
+            setTimeout(start, delay);
+        }} else {{
+            start();
+        }}
     }})();
 </script>
 </body>
