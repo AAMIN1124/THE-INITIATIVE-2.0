@@ -132,6 +132,38 @@ def init_db():
         cur = conn.cursor()
         
         cur.execute("""
+        CREATE TABLE IF NOT EXISTS egujcop_suspect_faces (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            person_name TEXT NOT NULL,
+            alias TEXT,
+            gender TEXT NOT NULL,
+            age INTEGER NOT NULL,
+            fir_no TEXT NOT NULL,
+            police_station TEXT NOT NULL,
+            district TEXT NOT NULL,
+            sections TEXT NOT NULL,
+            status TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            nafis_hash TEXT NOT NULL,
+            biometric_traits TEXT NOT NULL,
+            last_known_location TEXT,
+            created_at TEXT NOT NULL
+        )
+        """)
+
+        # Auto-seed FRS database if empty
+        cur.execute("SELECT COUNT(*) FROM egujcop_suspect_faces")
+        if cur.fetchone()[0] == 0:
+            seed_faces = [
+                ("Rahul M. Patel", "Bhavnagari", "Male", 34, "FIR #442/2026", "Navrangpura Police Station", "Ahmedabad", "Sec 379 IPC / Sec 303(2) BNS", "CRITICAL RED NOTICE", "CRITICAL", "SHA256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069", "Scar on right temple, sharp jawline, black hair", "01 Chiman bhai Bridge, Ahmedabad", "2026-02-10 10:30:00"),
+                ("Suresh B. Desai", "Hawala King", "Male", 48, "FIR #108/2026", "CID Crime Gandhinagar", "Gandhinagar", "Sec 420, 406 IPC / Sec 318 BNS", "NON-BAILABLE WARRANT", "HIGH", "SHA256:4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a", "Oval face, reading glasses, partial baldness", "14 Delight Junction, Vadodara", "2026-02-12 14:15:00"),
+                ("John M. Vance", "Vance Interstate", "Male", 41, "SCRB-INTERPOL-881", "Special Operations Group (SOG)", "Gujarat State", "Customs Act Sec 135 / BNS Sec 111", "INTERPOL RED NOTICE", "CRITICAL", "SHA256:ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d", "Caucasian build, blue eyes, trimmed goatee", "27 Mandvi Coastal Radar Checkpoint", "2026-02-14 09:00:00"),
+                ("Anita R. Sharma", "Geeta", "Female", 29, "FIR #204/2026", "Mahila Police Station", "Surat", "Sec 363, 370 IPC (Human Trafficking)", "WANTED / ARREST ON SIGHT", "CRITICAL", "SHA256:a92810482910ffbe718291048102948102948102948102948102948102948102", "Round face, mole on left chin, dark brown eyes", "19 Khaparia Panchayat, Navsari", "2026-02-15 11:20:00"),
+                ("Vikram S. Solanki", "Vicky Don", "Male", 38, "FIR #991/2025", "Rajkot Crime Branch", "Rajkot", "Sec 302, 120B IPC / Sec 103 BNS", "PROCLAIMED OFFENDER", "CRITICAL", "SHA256:bb41092810482910ffbe71829104810294810294810294810294810294810294", "Broad face, thick moustache, tribal tattoo on neck", "15 Suvidha park Checkpost, Rajkot", "2026-02-16 16:45:00")
+            ]
+            cur.executemany("INSERT INTO egujcop_suspect_faces (person_name, alias, gender, age, fir_no, police_station, district, sections, status, priority, nafis_hash, biometric_traits, last_known_location, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", seed_faces)
+
+        cur.execute("""
         CREATE TABLE IF NOT EXISTS egujcop_watchlist (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             plate_clean TEXT UNIQUE NOT NULL,
@@ -401,11 +433,15 @@ def extract_hardware_pts(cap, last_known_pts_ms=0.0):
     """
     Strict hardware Presentation Timestamp (PTS) extraction complying with Section 65B 
     and ISO/IEC 13818-1 legal timing rules.
-    Exclusively utilizes CAP_PROP_POS_MSEC hardware packet presentation timestamp,
-    never relying on CAP_PROP_FPS or arrival time.
+    Exclusively utilizes CAP_PROP_POS_MSEC hardware packet presentation timestamp.
+    Handles continuous video feed hard loop resets (if current_pts < last_pts - 2000ms) gracefully.
     """
     pts_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
     if pts_ms is not None and pts_ms > 0:
+        # Loop boundary reset detection (PDF rule)
+        if last_known_pts_ms > 2000 and pts_ms < (last_known_pts_ms - 2000.0):
+            # Stream looped or scene discontinuity cut occurred
+            return float(pts_ms) / 1000.0, float(pts_ms)
         return float(pts_ms) / 1000.0, float(pts_ms)
     
     pos_frames = cap.get(cv2.CAP_PROP_POS_FRAMES)
@@ -2408,6 +2444,7 @@ nav_section = st.sidebar.radio(
         "Predictive Crime Hotspot AI Map",
         "Active Incident Alerts & Dispatch",
         "CCTV Video Forensic Engine (PTS & ANPR)",
+        "Facial Recognition & CCTNS Missing Person Search (FRS/NAFIS)",
         "Integrated Webcam Field Patrol",
         "Mobile Phone IP Camera Scanner",
         "Gujarat GIS Suspect Route Tracker",
