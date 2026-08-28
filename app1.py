@@ -1839,9 +1839,13 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         window.addEventListener('unload', cleanSocket);
         window.addEventListener('pagehide', cleanSocket);
 
-        function playStream() {{
-            if (streamUrl.indexOf('.m3u8') !== -1 && Hls.isSupported()) {{
-                var hls = new Hls({{ maxBufferLength: 5, enableWorker: true }});
+                function playStream() {{
+            if (Hls.isSupported()) {{
+                var hls = new Hls({{
+                    maxBufferLength: 5,
+                    enableWorker: true,
+                    lowLatencyMode: true
+                }});
                 hls.loadSource(streamUrl);
                 hls.attachMedia(v);
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {{
@@ -1849,18 +1853,22 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
                 }});
                 hls.on(Hls.Events.ERROR, function(event, data) {{
                     if (data.fatal) {{
-                        setTimeout(function() {{ hls.loadSource(streamUrl); }}, 1000);
+                        try {{
+                            hls.destroy();
+                            v.src = streamUrl;
+                            v.load();
+                            v.play().catch(function(){{}});
+                        }} catch(e) {{}}
                     }}
                 }});
+            }} else if (v.canPlayType('application/vnd.apple.mpegurl')) {{
+                v.src = streamUrl;
+                v.load();
+                v.play().catch(function(){{}});
             }} else {{
                 v.src = streamUrl;
                 v.load();
-                var p = v.play();
-                if (p !== undefined) {{
-                    p.catch(function() {{
-                        setTimeout(function() {{ v.play().catch(function(){{}}); }}, 200);
-                    }});
-                }}
+                v.play().catch(function(){{}});
             }}
         }}
 
