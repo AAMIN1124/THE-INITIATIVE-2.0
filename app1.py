@@ -119,36 +119,174 @@ GATEWAY_DISCOVERY_URL = os.environ.get("GATEWAY_DISCOVERY_URL", "https://live.co
 DISCOVERY_CACHE = {"last_fetch": 0.0, "backoff": 2.0, "cameras": []}
 
 STATIC_CCTV_CATALOGUE = [
-    {"stream_id": "1", "cam_id": "CAM-01", "name": "01 Chiman bhai Bridge", "lat": 23.0450, "lon": 72.5710, "city": "Ahmedabad", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
-    {"stream_id": "2", "cam_id": "CAM-02", "name": "02 Janpath", "lat": 23.0300, "lon": 72.5600, "city": "Ahmedabad", "type": "High-Mast Bullet", "dept": "SCRB Highway", "status": "ONLINE", "verified": True},
-    {"stream_id": "3", "cam_id": "CAM-03", "name": "03 O.N.G.C. Office", "lat": 23.0900, "lon": 72.5900, "city": "Ahmedabad", "type": "Dome 360", "dept": "Smart City Mission", "status": "ONLINE", "verified": False},
-    {"stream_id": "4", "cam_id": "CAM-04", "name": "04 Paldi Circle", "lat": 23.0140, "lon": 72.5660, "city": "Ahmedabad", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
-    {"stream_id": "5", "cam_id": "CAM-05", "name": "05 Visat teen Rasta", "lat": 23.1050, "lon": 72.5950, "city": "Ahmedabad", "type": "4K ANPR PTZ", "dept": "SCRB Cyber Grid", "status": "ONLINE", "verified": False},
-    {"stream_id": "6", "cam_id": "CAM-06", "name": "06 Timbavadi gate-Junagadh", "lat": 21.5120, "lon": 70.4480, "city": "Junagadh", "type": "Secure Perimeter", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "7", "cam_id": "CAM-07", "name": "07 hero-showroom-gir-somnath", "lat": 20.9100, "lon": 70.4100, "city": "Somnath", "type": "Radar Speed Gun", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
-    {"stream_id": "8", "cam_id": "CAM-08", "name": "08 majewadi-gate-junagadh", "lat": 21.5220, "lon": 70.4570, "city": "Junagadh", "type": "4K ANPR PTZ", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "9", "cam_id": "CAM-09", "name": "09 new-bypass-circle-junagadh", "lat": 21.5350, "lon": 70.4700, "city": "Junagadh", "type": "Toll ANPR Barrier", "dept": "Highway Patrol", "status": "ONLINE", "verified": False},
-    {"stream_id": "10", "cam_id": "CAM-10", "name": "10 char-chowk-road-junagadh", "lat": 21.5180, "lon": 70.4520, "city": "Junagadh", "type": "Bullet Surveillance", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "11", "cam_id": "CAM-11", "name": "11 dolatpara-junagadh", "lat": 21.5400, "lon": 70.4650, "city": "Junagadh", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
-    {"stream_id": "12", "cam_id": "CAM-12", "name": "12 Tri Mandir Adalaj Tollnaka", "lat": 23.1600, "lon": 72.5800, "city": "Gandhinagar", "type": "High-Mast PTZ", "dept": "Highway Patrol", "status": "ONLINE", "verified": True},
-    {"stream_id": "13", "cam_id": "CAM-13", "name": "13 CN Vidhyalaya", "lat": 23.0250, "lon": 72.5450, "city": "Ahmedabad", "type": "Airport Security", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "14", "cam_id": "CAM-14", "name": "14 Delight Junction", "lat": 22.3000, "lon": 73.1800, "city": "Vadodara", "type": "Fixed ANPR Dual", "dept": "Highway Patrol", "status": "ONLINE", "verified": True},
-    {"stream_id": "15", "cam_id": "CAM-15", "name": "15 Suvidha park Checkpost", "lat": 22.2900, "lon": 70.7800, "city": "Rajkot", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
-    {"stream_id": "16", "cam_id": "CAM-16", "name": "16 Visat P2 Checkpost", "lat": 23.1100, "lon": 72.6000, "city": "Ahmedabad", "type": "City Dome Camera", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "17", "cam_id": "CAM-17", "name": "17 Rajkot Bus Port CCTV", "lat": 22.3050, "lon": 70.8020, "city": "Rajkot", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
-    {"stream_id": "18", "cam_id": "CAM-18", "name": "18 Rajkot City CCTV", "lat": 22.2800, "lon": 70.7900, "city": "Rajkot", "type": "Heritage PTZ", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "19", "cam_id": "CAM-19", "name": "19 Khaparia Panchayat, Navsari", "lat": 20.7634, "lon": 72.9554, "city": "Navsari", "type": "Port Heavy ANPR", "dept": "Rural Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "20", "cam_id": "CAM-20", "name": "20 Mohanpura Junction", "lat": 23.5880, "lon": 72.3690, "city": "Mehsana", "type": "Border Surveillance", "dept": "Special Ops Group", "status": "ONLINE", "verified": False},
-    {"stream_id": "21", "cam_id": "CAM-21", "name": "21 Patan Dethali Char Rasta", "lat": 23.8500, "lon": 72.1300, "city": "Patan", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
-    {"stream_id": "22", "cam_id": "CAM-22", "name": "22 BK Mervada tran Rasta", "lat": 24.1700, "lon": 72.4300, "city": "Banaskantha", "type": "Toll Barrier ANPR", "dept": "Highway Patrol", "status": "ONLINE", "verified": True},
-    {"stream_id": "23", "cam_id": "CAM-23", "name": "23 Kheram Checkpost", "lat": 22.5640, "lon": 72.9280, "city": "Anand", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
-    {"stream_id": "24", "cam_id": "CAM-24", "name": "24 Dehgam Junction", "lat": 23.1670, "lon": 72.8120, "city": "Gandhinagar", "type": "Highway ANPR", "dept": "North Zone Patrol", "status": "ONLINE", "verified": False},
-    {"stream_id": "25", "cam_id": "CAM-25", "name": "25 Dhanori Checkpost", "lat": 20.9020, "lon": 72.9200, "city": "Navsari", "type": "Coastal Radar PTZ", "dept": "Marine Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "26", "cam_id": "CAM-26", "name": "26 Ratanpur Border Checkpost", "lat": 23.8500, "lon": 73.1200, "city": "Sabarkantha", "type": "4K ANPR PTZ", "dept": "SCRB Highway", "status": "ONLINE", "verified": True},
-    {"stream_id": "27", "cam_id": "CAM-27", "name": "27 Mandvi Coastal Radar Checkpoint", "lat": 22.8300, "lon": 69.3500, "city": "Kutch", "type": "Coastal Radar PTZ", "dept": "Marine Police", "status": "ONLINE", "verified": True},
-    {"stream_id": "28", "cam_id": "CAM-28", "name": "28 Chhota Udaipur Transit Barrier", "lat": 22.3080, "lon": 74.0150, "city": "Chhota Udaipur", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
-    {"stream_id": "29", "cam_id": "CAM-29", "name": "29 Morbi Ceramic Highway Node", "lat": 22.8120, "lon": 70.8350, "city": "Morbi", "type": "High-Mast Bullet", "dept": "City Police", "status": "ONLINE", "verified": True},
-    {"stream_id": "30", "cam_id": "CAM-30", "name": "30 Somnath Temple Perimeter", "lat": 20.8880, "lon": 70.4010, "city": "Somnath", "type": "Dome 360", "dept": "State Security", "status": "ONLINE", "verified": True}
+    {
+        "stream_id": "1", "cam_id": "CAM-01", "name": "01 Chiman Bhai Bridge", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.0450, "lon": 72.5710, "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "4-lane flyover approach & parked autos",
+        "ai_features": ["Multi-Class Flow Density", "Illegal Curb Parking Sentry", "Stalled Vehicle Hazard Alert"],
+        "pillar": "Highway & Checkpost ANPR Grid"
+    },
+    {
+        "stream_id": "2", "cam_id": "CAM-02", "name": "02 Janpath Junction", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.0300, "lon": 72.5600, "type": "High-Mast Bullet", "dept": "SCRB Highway", "status": "ONLINE", "verified": True,
+        "scene": "T-Junction with Zebra crossing & bus lane",
+        "ai_features": ["Zebra Stop-Line Encroachment (RLVD)", "Wrong-Way & Illegal U-Turn Radar", "AMTS Bus Lane Priority Tracker"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "3", "cam_id": "CAM-03", "name": "03 O.N.G.C. Office", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.0900, "lon": 72.5900, "type": "Dome 360", "dept": "Smart City Mission", "status": "ONLINE", "verified": True,
+        "scene": "Direct overhead road shoulder view",
+        "ai_features": ["Helmetless Rider AI (Sec 129 MVA)", "Triple Riding Detection (Sec 128 MVA)", "Roadside Suspicious Loitering Alert"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "4", "cam_id": "CAM-04", "name": "04 Paldi Circle", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.0140, "lon": 72.5660, "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "Large multi-directional roundabout",
+        "ai_features": ["Roundabout Congestion & Velocity Heatmap", "Wrong-Direction Circle Entry Radar", "Cross-Camera Vehicle Re-ID Waypoint"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "5", "cam_id": "CAM-05", "name": "05 Visat Teen Rasta", "city": "Ahmedabad", "district": "Gandhinagar",
+        "lat": 23.1050, "lon": 72.5950, "type": "4K ANPR PTZ", "dept": "SCRB Cyber Grid", "status": "ONLINE", "verified": True,
+        "scene": "Dual carriageway + Central BRTS Bus corridor",
+        "ai_features": ["Dedicated BRTS Lane Intrusion AI", "Highway Velocity & Over-Speeding Radar", "Left vs Right Lane Density Balancing"],
+        "pillar": "Public Transit & Transport Safety"
+    },
+    {
+        "stream_id": "6", "cam_id": "CAM-06", "name": "06 Timbavadi Gate", "city": "Junagadh", "district": "Junagadh",
+        "lat": 21.5120, "lon": 70.4480, "type": "Secure Perimeter", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "Medium-range asphalt road with turning bikes",
+        "ai_features": ["Mid-Range Number Plate Capture (ANPR)", "Two-Wheeler Helmet Violation", "Near-Miss Collision Alert"],
+        "pillar": "Highway & Checkpost ANPR Grid"
+    },
+    {
+        "stream_id": "7", "cam_id": "CAM-07", "name": "07 Hero Showroom", "city": "Gir Somnath", "district": "Gir Somnath",
+        "lat": 20.9100, "lon": 70.4100, "type": "Radar Speed Gun", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "High-contrast night/low-light bypass road",
+        "ai_features": ["Night Anti-Smuggling Tracker (11 PM–4 AM)", "Headlight Anti-Glare Optical Filter", "Coastal Freight Transit Logger"],
+        "pillar": "Highway & Checkpost ANPR Grid"
+    },
+    {
+        "stream_id": "8", "cam_id": "CAM-08", "name": "08 Majewadi Gate", "city": "Junagadh", "district": "Junagadh",
+        "lat": 21.5220, "lon": 70.4570, "type": "4K ANPR PTZ", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "Crowded heritage market junction",
+        "ai_features": ["Market Chokepoint Congestion Index", "Illegal Loading / Stalled Auto Obstruction", "Pedestrian Safety Flow Analytics"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "9", "cam_id": "CAM-09", "name": "09 New Bypass Near Circle", "city": "Junagadh", "district": "Junagadh",
+        "lat": 21.5350, "lon": 70.4700, "type": "Toll ANPR Barrier", "dept": "Highway Patrol", "status": "ONLINE", "verified": True,
+        "scene": "Straight frontal lane approach (White Car)",
+        "ai_features": ["Primary High-Precision ANPR Hub", "eGujCop / CCTNS Stolen Vehicle Intercept", "Stop-Line Breach & Ingress Speed Radar"],
+        "pillar": "Highway & Checkpost ANPR Grid"
+    },
+    {
+        "stream_id": "10", "cam_id": "CAM-10", "name": "10 Char Chowk Road", "city": "Junagadh", "district": "Junagadh",
+        "lat": 21.5180, "lon": 70.4520, "type": "Bullet Surveillance", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "Crossroad with center pole & public rally",
+        "ai_features": ["Public Gathering / Procession Crowd AI", "Center-Pole Collision Alert", "Roadside Parking Obstruction"],
+        "pillar": "Public Transit & Transport Safety"
+    },
+    {
+        "stream_id": "11", "cam_id": "CAM-11", "name": "11 Dolatpara Gate", "city": "Junagadh", "district": "Junagadh",
+        "lat": 21.5400, "lon": 70.4650, "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "Town gate with close-up foreground people",
+        "ai_features": ["Missing Person / FRS Face Search Hub", "Commercial Truck Loading Zone Sentry", "Town Entry/Exit Gate Logger"],
+        "pillar": "Railway / Bus Terminal Indoor Security"
+    },
+    {
+        "stream_id": "13", "cam_id": "CAM-13", "name": "13 CN Vidhyalaya", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.0250, "lon": 72.5450, "type": "School Zone Speed Gun", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "School zone intersection at night",
+        "ai_features": ["School Zone Speed & Night RLVD Engine", "Daytime Safe School Corridor AI", "Night Stunt / Rash Driving Alert"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "14", "cam_id": "CAM-14", "name": "14 Delight Junction", "city": "Vadodara", "district": "Vadodara",
+        "lat": 22.3000, "lon": 73.1800, "type": "Master RLVD Dual ANPR", "dept": "Highway Patrol", "status": "ONLINE", "verified": True,
+        "scene": "Night traffic signal with red light queue",
+        "ai_features": ["Master RLVD Engine (Red Light Auto-Challan)", "Night Headlight / Helmet Defect AI", "Signal Queue Dwell Time Analyzer"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "15", "cam_id": "CAM-15", "name": "15 Suvidha Park", "city": "Rajkot", "district": "Rajkot",
+        "lat": 22.2900, "lon": 70.7800, "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "Night stopline with glowing rear brake lights",
+        "ai_features": ["Stop-Line & Zebra Breach Auto-Challan", "Rear-Plate ANPR & Brake-Light Status", "Ambulance 108 Green-Wave Priority"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "16", "cam_id": "CAM-16", "name": "16 Visat P2 Overpass", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.1100, "lon": 72.6000, "type": "High-Mast Overpass", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "High-mast overpass with passing buses",
+        "ai_features": ["Heavy Bus & Multi-Axle Fleet Tracking", "Overpass Wrong-Way Entry Alert", "Flyover Approach Traffic Balancing"],
+        "pillar": "Public Transit & Transport Safety"
+    },
+    {
+        "stream_id": "18", "cam_id": "CAM-18", "name": "18 Rajkot Bus Port", "city": "Rajkot", "district": "Rajkot",
+        "lat": 22.2800, "lon": 70.7900, "type": "GSRTC Depot Sentry", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "GSRTC bus depot apron & tarmac",
+        "ai_features": ["Bus Blindspot Pedestrian Collision Alert", "GSRTC Fleet Timetable Logging", "Unauthorized Auto Encroachment in Bay"],
+        "pillar": "Public Transit & Transport Safety"
+    },
+    {
+        "stream_id": "19", "cam_id": "CAM-19", "name": "19 Khaparia Panchayat", "city": "Navsari", "district": "Navsari",
+        "lat": 20.7634, "lon": 72.9554, "type": "Rural Edge Sentry", "dept": "Rural Police", "status": "ONLINE", "verified": True,
+        "scene": "Wet rural village street with sparse traffic",
+        "ai_features": ["Rural Edge Bandwidth Saver (99% Data Saved)", "Night Unknown Vehicle Ingress Alert", "Monsoon Road Waterlogging Hazard"],
+        "pillar": "Rural 80,000 Edge Scale & Animal Hazard"
+    },
+    {
+        "stream_id": "20", "cam_id": "CAM-20", "name": "20 Mohanpura Junction", "city": "Mehsana", "district": "Mehsana",
+        "lat": 23.5880, "lon": 72.3690, "type": "Speed-Breaker Radar", "dept": "Special Ops Group", "status": "ONLINE", "verified": True,
+        "scene": "Rural road with high-angle speed-breaker",
+        "ai_features": ["Speed-Breaker Reckless Jumping Alert", "Pothole / Monsoon Water Puddle AI", "Rural Cattle Crossing Hazard"],
+        "pillar": "Rural 80,000 Edge Scale & Animal Hazard"
+    },
+    {
+        "stream_id": "23", "cam_id": "CAM-23", "name": "23 Kheram Checkpost", "city": "Anand", "district": "Anand",
+        "lat": 22.5640, "lon": 72.9280, "type": "Night Edge Sentry", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "Night rural road under single streetlamp",
+        "ai_features": ["Edge Motion-Triggered Night Sentry", "Stranger Vehicle Ingress (11 PM–5 AM)", "Illegal Roadside Dumping Alert"],
+        "pillar": "Rural 80,000 Edge Scale & Animal Hazard"
+    },
+    {
+        "stream_id": "24", "cam_id": "CAM-24", "name": "24 Dehgam Night Sentry", "city": "Gandhinagar", "district": "Gandhinagar",
+        "lat": 23.1670, "lon": 72.8120, "type": "Night IR Sentry", "dept": "North Zone Patrol", "status": "ONLINE", "verified": True,
+        "scene": "03:25 AM night IR view with parked scooter",
+        "ai_features": ["Parked Two-Wheeler Theft & Tampering Alarm", "Midnight Curfew Movement Alert", "Late-Night Contraband Transit Sentry"],
+        "pillar": "Rural 80,000 Edge Scale & Animal Hazard"
+    },
+    {
+        "stream_id": "27", "cam_id": "CAM-27", "name": "27 Bilimora Platform Bay", "city": "Navsari", "district": "Navsari",
+        "lat": 20.7600, "lon": 72.9500, "type": "Platform Safety Sentry", "dept": "Marine & Rail Police", "status": "ONLINE", "verified": True,
+        "scene": "Indoor bus/train boarding platform (4 AM)",
+        "ai_features": ["Platform Edge Sleeping & Fall Hazard Alert", "Late-Night Public Transit Safety", "Terminal Track Intrusion Sentry"],
+        "pillar": "Railway / Bus Terminal Indoor Security"
+    },
+    {
+        "stream_id": "28", "cam_id": "CAM-28", "name": "28 Bilimora Concourse", "city": "Navsari", "district": "Navsari",
+        "lat": 20.7610, "lon": 72.9510, "type": "Indoor FRS Sentry", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "Illuminated indoor passage / corridor",
+        "ai_features": ["Indoor Missing Person / Criminal FRS", "Concourse Overcrowding & Stampede Sentry", "Public Asset Vandalism Detector"],
+        "pillar": "Railway / Bus Terminal Indoor Security"
+    },
+    {
+        "stream_id": "29", "cam_id": "CAM-29", "name": "29 Bilimora Waiting Hall", "city": "Navsari", "district": "Navsari",
+        "lat": 20.7620, "lon": 72.9520, "type": "Unattended Baggage AI", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "Indoor waiting room with benches (12 AM)",
+        "ai_features": ["Unattended Baggage / Suspicious Object AI", "Overnight Unauthorized Loitering Alert", "Public Infrastructure Night Sentry"],
+        "pillar": "Railway / Bus Terminal Indoor Security"
+    },
+    {
+        "stream_id": "30", "cam_id": "CAM-30", "name": "30 Gandhidham Rambaugh", "city": "Kutch", "district": "Kutch",
+        "lat": 23.0750, "lon": 70.1330, "type": "Stray Animal Radar", "dept": "State Security", "status": "ONLINE", "verified": True,
+        "scene": "Urban circle with cars & stray cow on road",
+        "ai_features": ["Stray Animal / Cattle Collision Alert", "Roundabout Traffic Flow & Wrong Entry", "Kandla Port Freight Corridor Tracker"],
+        "pillar": "Rural 80,000 Edge Scale & Animal Hazard"
+    }
 ]
 
 def generate_dynamic_discovery_grid():
@@ -1411,36 +1549,174 @@ if not st.session_state.authenticated:
 
 # ----------------- DATASETS & MODEL MANAGEMENT (CACHED SINGLETON) -----------------
 STATIC_CCTV_CATALOGUE = [
-    {"stream_id": "1", "cam_id": "CAM-01", "name": "01 Chiman bhai Bridge", "lat": 23.0450, "lon": 72.5710, "city": "Ahmedabad", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
-    {"stream_id": "2", "cam_id": "CAM-02", "name": "02 Janpath", "lat": 23.0300, "lon": 72.5600, "city": "Ahmedabad", "type": "High-Mast Bullet", "dept": "SCRB Highway", "status": "ONLINE", "verified": True},
-    {"stream_id": "3", "cam_id": "CAM-03", "name": "03 O.N.G.C. Office", "lat": 23.0900, "lon": 72.5900, "city": "Ahmedabad", "type": "Dome 360", "dept": "Smart City Mission", "status": "ONLINE", "verified": False},
-    {"stream_id": "4", "cam_id": "CAM-04", "name": "04 Paldi Circle", "lat": 23.0140, "lon": 72.5660, "city": "Ahmedabad", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
-    {"stream_id": "5", "cam_id": "CAM-05", "name": "05 Visat teen Rasta", "lat": 23.1050, "lon": 72.5950, "city": "Ahmedabad", "type": "4K ANPR PTZ", "dept": "SCRB Cyber Grid", "status": "ONLINE", "verified": False},
-    {"stream_id": "6", "cam_id": "CAM-06", "name": "06 Timbavadi gate-Junagadh", "lat": 21.5120, "lon": 70.4480, "city": "Junagadh", "type": "Secure Perimeter", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "7", "cam_id": "CAM-07", "name": "07 hero-showroom-gir-somnath", "lat": 20.9100, "lon": 70.4100, "city": "Somnath", "type": "Radar Speed Gun", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
-    {"stream_id": "8", "cam_id": "CAM-08", "name": "08 majewadi-gate-junagadh", "lat": 21.5220, "lon": 70.4570, "city": "Junagadh", "type": "4K ANPR PTZ", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "9", "cam_id": "CAM-09", "name": "09 new-bypass-circle-junagadh", "lat": 21.5350, "lon": 70.4700, "city": "Junagadh", "type": "Toll ANPR Barrier", "dept": "Highway Patrol", "status": "ONLINE", "verified": False},
-    {"stream_id": "10", "cam_id": "CAM-10", "name": "10 char-chowk-road-junagadh", "lat": 21.5180, "lon": 70.4520, "city": "Junagadh", "type": "Bullet Surveillance", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "11", "cam_id": "CAM-11", "name": "11 dolatpara-junagadh", "lat": 21.5400, "lon": 70.4650, "city": "Junagadh", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
-    {"stream_id": "12", "cam_id": "CAM-12", "name": "12 Tri Mandir Adalaj Tollnaka", "lat": 23.1600, "lon": 72.5800, "city": "Gandhinagar", "type": "High-Mast PTZ", "dept": "Highway Patrol", "status": "ONLINE", "verified": True},
-    {"stream_id": "13", "cam_id": "CAM-13", "name": "13 CN Vidhyalaya", "lat": 23.0250, "lon": 72.5450, "city": "Ahmedabad", "type": "Airport Security", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "14", "cam_id": "CAM-14", "name": "14 Delight Junction", "lat": 22.3000, "lon": 73.1800, "city": "Vadodara", "type": "Fixed ANPR Dual", "dept": "Highway Patrol", "status": "ONLINE", "verified": True},
-    {"stream_id": "15", "cam_id": "CAM-15", "name": "15 Suvidha park Checkpost", "lat": 22.2900, "lon": 70.7800, "city": "Rajkot", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
-    {"stream_id": "16", "cam_id": "CAM-16", "name": "16 Visat P2 Checkpost", "lat": 23.1100, "lon": 72.6000, "city": "Ahmedabad", "type": "City Dome Camera", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "17", "cam_id": "CAM-17", "name": "17 Rajkot Bus Port CCTV", "lat": 22.3050, "lon": 70.8020, "city": "Rajkot", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
-    {"stream_id": "18", "cam_id": "CAM-18", "name": "18 Rajkot City CCTV", "lat": 22.2800, "lon": 70.7900, "city": "Rajkot", "type": "Heritage PTZ", "dept": "City Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "19", "cam_id": "CAM-19", "name": "19 Khaparia Panchayat, Navsari", "lat": 20.7634, "lon": 72.9554, "city": "Navsari", "type": "Port Heavy ANPR", "dept": "Rural Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "20", "cam_id": "CAM-20", "name": "20 Mohanpura Junction", "lat": 23.5880, "lon": 72.3690, "city": "Mehsana", "type": "Border Surveillance", "dept": "Special Ops Group", "status": "ONLINE", "verified": False},
-    {"stream_id": "21", "cam_id": "CAM-21", "name": "21 Patan Dethali Char Rasta", "lat": 23.8500, "lon": 72.1300, "city": "Patan", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
-    {"stream_id": "22", "cam_id": "CAM-22", "name": "22 BK Mervada tran Rasta", "lat": 24.1700, "lon": 72.4300, "city": "Banaskantha", "type": "Toll Barrier ANPR", "dept": "Highway Patrol", "status": "ONLINE", "verified": True},
-    {"stream_id": "23", "cam_id": "CAM-23", "name": "23 Kheram Checkpost", "lat": 22.5640, "lon": 72.9280, "city": "Anand", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
-    {"stream_id": "24", "cam_id": "CAM-24", "name": "24 Dehgam Junction", "lat": 23.1670, "lon": 72.8120, "city": "Gandhinagar", "type": "Highway ANPR", "dept": "North Zone Patrol", "status": "ONLINE", "verified": False},
-    {"stream_id": "25", "cam_id": "CAM-25", "name": "25 Dhanori Checkpost", "lat": 20.9020, "lon": 72.9200, "city": "Navsari", "type": "Coastal Radar PTZ", "dept": "Marine Police", "status": "ONLINE", "verified": False},
-    {"stream_id": "26", "cam_id": "CAM-26", "name": "26 Ratanpur Border Checkpost", "lat": 23.8500, "lon": 73.1200, "city": "Sabarkantha", "type": "4K ANPR PTZ", "dept": "SCRB Highway", "status": "ONLINE", "verified": True},
-    {"stream_id": "27", "cam_id": "CAM-27", "name": "27 Mandvi Coastal Radar Checkpoint", "lat": 22.8300, "lon": 69.3500, "city": "Kutch", "type": "Coastal Radar PTZ", "dept": "Marine Police", "status": "ONLINE", "verified": True},
-    {"stream_id": "28", "cam_id": "CAM-28", "name": "28 Chhota Udaipur Transit Barrier", "lat": 22.3080, "lon": 74.0150, "city": "Chhota Udaipur", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
-    {"stream_id": "29", "cam_id": "CAM-29", "name": "29 Morbi Ceramic Highway Node", "lat": 22.8120, "lon": 70.8350, "city": "Morbi", "type": "High-Mast Bullet", "dept": "City Police", "status": "ONLINE", "verified": True},
-    {"stream_id": "30", "cam_id": "CAM-30", "name": "30 Somnath Temple Perimeter", "lat": 20.8880, "lon": 70.4010, "city": "Somnath", "type": "Dome 360", "dept": "State Security", "status": "ONLINE", "verified": True}
+    {
+        "stream_id": "1", "cam_id": "CAM-01", "name": "01 Chiman Bhai Bridge", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.0450, "lon": 72.5710, "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "4-lane flyover approach & parked autos",
+        "ai_features": ["Multi-Class Flow Density", "Illegal Curb Parking Sentry", "Stalled Vehicle Hazard Alert"],
+        "pillar": "Highway & Checkpost ANPR Grid"
+    },
+    {
+        "stream_id": "2", "cam_id": "CAM-02", "name": "02 Janpath Junction", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.0300, "lon": 72.5600, "type": "High-Mast Bullet", "dept": "SCRB Highway", "status": "ONLINE", "verified": True,
+        "scene": "T-Junction with Zebra crossing & bus lane",
+        "ai_features": ["Zebra Stop-Line Encroachment (RLVD)", "Wrong-Way & Illegal U-Turn Radar", "AMTS Bus Lane Priority Tracker"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "3", "cam_id": "CAM-03", "name": "03 O.N.G.C. Office", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.0900, "lon": 72.5900, "type": "Dome 360", "dept": "Smart City Mission", "status": "ONLINE", "verified": True,
+        "scene": "Direct overhead road shoulder view",
+        "ai_features": ["Helmetless Rider AI (Sec 129 MVA)", "Triple Riding Detection (Sec 128 MVA)", "Roadside Suspicious Loitering Alert"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "4", "cam_id": "CAM-04", "name": "04 Paldi Circle", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.0140, "lon": 72.5660, "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "Large multi-directional roundabout",
+        "ai_features": ["Roundabout Congestion & Velocity Heatmap", "Wrong-Direction Circle Entry Radar", "Cross-Camera Vehicle Re-ID Waypoint"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "5", "cam_id": "CAM-05", "name": "05 Visat Teen Rasta", "city": "Ahmedabad", "district": "Gandhinagar",
+        "lat": 23.1050, "lon": 72.5950, "type": "4K ANPR PTZ", "dept": "SCRB Cyber Grid", "status": "ONLINE", "verified": True,
+        "scene": "Dual carriageway + Central BRTS Bus corridor",
+        "ai_features": ["Dedicated BRTS Lane Intrusion AI", "Highway Velocity & Over-Speeding Radar", "Left vs Right Lane Density Balancing"],
+        "pillar": "Public Transit & Transport Safety"
+    },
+    {
+        "stream_id": "6", "cam_id": "CAM-06", "name": "06 Timbavadi Gate", "city": "Junagadh", "district": "Junagadh",
+        "lat": 21.5120, "lon": 70.4480, "type": "Secure Perimeter", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "Medium-range asphalt road with turning bikes",
+        "ai_features": ["Mid-Range Number Plate Capture (ANPR)", "Two-Wheeler Helmet Violation", "Near-Miss Collision Alert"],
+        "pillar": "Highway & Checkpost ANPR Grid"
+    },
+    {
+        "stream_id": "7", "cam_id": "CAM-07", "name": "07 Hero Showroom", "city": "Gir Somnath", "district": "Gir Somnath",
+        "lat": 20.9100, "lon": 70.4100, "type": "Radar Speed Gun", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "High-contrast night/low-light bypass road",
+        "ai_features": ["Night Anti-Smuggling Tracker (11 PM–4 AM)", "Headlight Anti-Glare Optical Filter", "Coastal Freight Transit Logger"],
+        "pillar": "Highway & Checkpost ANPR Grid"
+    },
+    {
+        "stream_id": "8", "cam_id": "CAM-08", "name": "08 Majewadi Gate", "city": "Junagadh", "district": "Junagadh",
+        "lat": 21.5220, "lon": 70.4570, "type": "4K ANPR PTZ", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "Crowded heritage market junction",
+        "ai_features": ["Market Chokepoint Congestion Index", "Illegal Loading / Stalled Auto Obstruction", "Pedestrian Safety Flow Analytics"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "9", "cam_id": "CAM-09", "name": "09 New Bypass Near Circle", "city": "Junagadh", "district": "Junagadh",
+        "lat": 21.5350, "lon": 70.4700, "type": "Toll ANPR Barrier", "dept": "Highway Patrol", "status": "ONLINE", "verified": True,
+        "scene": "Straight frontal lane approach (White Car)",
+        "ai_features": ["Primary High-Precision ANPR Hub", "eGujCop / CCTNS Stolen Vehicle Intercept", "Stop-Line Breach & Ingress Speed Radar"],
+        "pillar": "Highway & Checkpost ANPR Grid"
+    },
+    {
+        "stream_id": "10", "cam_id": "CAM-10", "name": "10 Char Chowk Road", "city": "Junagadh", "district": "Junagadh",
+        "lat": 21.5180, "lon": 70.4520, "type": "Bullet Surveillance", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "Crossroad with center pole & public rally",
+        "ai_features": ["Public Gathering / Procession Crowd AI", "Center-Pole Collision Alert", "Roadside Parking Obstruction"],
+        "pillar": "Public Transit & Transport Safety"
+    },
+    {
+        "stream_id": "11", "cam_id": "CAM-11", "name": "11 Dolatpara Gate", "city": "Junagadh", "district": "Junagadh",
+        "lat": 21.5400, "lon": 70.4650, "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "Town gate with close-up foreground people",
+        "ai_features": ["Missing Person / FRS Face Search Hub", "Commercial Truck Loading Zone Sentry", "Town Entry/Exit Gate Logger"],
+        "pillar": "Railway / Bus Terminal Indoor Security"
+    },
+    {
+        "stream_id": "13", "cam_id": "CAM-13", "name": "13 CN Vidhyalaya", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.0250, "lon": 72.5450, "type": "School Zone Speed Gun", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "School zone intersection at night",
+        "ai_features": ["School Zone Speed & Night RLVD Engine", "Daytime Safe School Corridor AI", "Night Stunt / Rash Driving Alert"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "14", "cam_id": "CAM-14", "name": "14 Delight Junction", "city": "Vadodara", "district": "Vadodara",
+        "lat": 22.3000, "lon": 73.1800, "type": "Master RLVD Dual ANPR", "dept": "Highway Patrol", "status": "ONLINE", "verified": True,
+        "scene": "Night traffic signal with red light queue",
+        "ai_features": ["Master RLVD Engine (Red Light Auto-Challan)", "Night Headlight / Helmet Defect AI", "Signal Queue Dwell Time Analyzer"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "15", "cam_id": "CAM-15", "name": "15 Suvidha Park", "city": "Rajkot", "district": "Rajkot",
+        "lat": 22.2900, "lon": 70.7800, "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "Night stopline with glowing rear brake lights",
+        "ai_features": ["Stop-Line & Zebra Breach Auto-Challan", "Rear-Plate ANPR & Brake-Light Status", "Ambulance 108 Green-Wave Priority"],
+        "pillar": "Smart Traffic & RLVD Safety"
+    },
+    {
+        "stream_id": "16", "cam_id": "CAM-16", "name": "16 Visat P2 Overpass", "city": "Ahmedabad", "district": "Ahmedabad",
+        "lat": 23.1100, "lon": 72.6000, "type": "High-Mast Overpass", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "High-mast overpass with passing buses",
+        "ai_features": ["Heavy Bus & Multi-Axle Fleet Tracking", "Overpass Wrong-Way Entry Alert", "Flyover Approach Traffic Balancing"],
+        "pillar": "Public Transit & Transport Safety"
+    },
+    {
+        "stream_id": "18", "cam_id": "CAM-18", "name": "18 Rajkot Bus Port", "city": "Rajkot", "district": "Rajkot",
+        "lat": 22.2800, "lon": 70.7900, "type": "GSRTC Depot Sentry", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "GSRTC bus depot apron & tarmac",
+        "ai_features": ["Bus Blindspot Pedestrian Collision Alert", "GSRTC Fleet Timetable Logging", "Unauthorized Auto Encroachment in Bay"],
+        "pillar": "Public Transit & Transport Safety"
+    },
+    {
+        "stream_id": "19", "cam_id": "CAM-19", "name": "19 Khaparia Panchayat", "city": "Navsari", "district": "Navsari",
+        "lat": 20.7634, "lon": 72.9554, "type": "Rural Edge Sentry", "dept": "Rural Police", "status": "ONLINE", "verified": True,
+        "scene": "Wet rural village street with sparse traffic",
+        "ai_features": ["Rural Edge Bandwidth Saver (99% Data Saved)", "Night Unknown Vehicle Ingress Alert", "Monsoon Road Waterlogging Hazard"],
+        "pillar": "Rural 80,000 Edge Scale & Animal Hazard"
+    },
+    {
+        "stream_id": "20", "cam_id": "CAM-20", "name": "20 Mohanpura Junction", "city": "Mehsana", "district": "Mehsana",
+        "lat": 23.5880, "lon": 72.3690, "type": "Speed-Breaker Radar", "dept": "Special Ops Group", "status": "ONLINE", "verified": True,
+        "scene": "Rural road with high-angle speed-breaker",
+        "ai_features": ["Speed-Breaker Reckless Jumping Alert", "Pothole / Monsoon Water Puddle AI", "Rural Cattle Crossing Hazard"],
+        "pillar": "Rural 80,000 Edge Scale & Animal Hazard"
+    },
+    {
+        "stream_id": "23", "cam_id": "CAM-23", "name": "23 Kheram Checkpost", "city": "Anand", "district": "Anand",
+        "lat": 22.5640, "lon": 72.9280, "type": "Night Edge Sentry", "dept": "Traffic Branch", "status": "ONLINE", "verified": True,
+        "scene": "Night rural road under single streetlamp",
+        "ai_features": ["Edge Motion-Triggered Night Sentry", "Stranger Vehicle Ingress (11 PM–5 AM)", "Illegal Roadside Dumping Alert"],
+        "pillar": "Rural 80,000 Edge Scale & Animal Hazard"
+    },
+    {
+        "stream_id": "24", "cam_id": "CAM-24", "name": "24 Dehgam Night Sentry", "city": "Gandhinagar", "district": "Gandhinagar",
+        "lat": 23.1670, "lon": 72.8120, "type": "Night IR Sentry", "dept": "North Zone Patrol", "status": "ONLINE", "verified": True,
+        "scene": "03:25 AM night IR view with parked scooter",
+        "ai_features": ["Parked Two-Wheeler Theft & Tampering Alarm", "Midnight Curfew Movement Alert", "Late-Night Contraband Transit Sentry"],
+        "pillar": "Rural 80,000 Edge Scale & Animal Hazard"
+    },
+    {
+        "stream_id": "27", "cam_id": "CAM-27", "name": "27 Bilimora Platform Bay", "city": "Navsari", "district": "Navsari",
+        "lat": 20.7600, "lon": 72.9500, "type": "Platform Safety Sentry", "dept": "Marine & Rail Police", "status": "ONLINE", "verified": True,
+        "scene": "Indoor bus/train boarding platform (4 AM)",
+        "ai_features": ["Platform Edge Sleeping & Fall Hazard Alert", "Late-Night Public Transit Safety", "Terminal Track Intrusion Sentry"],
+        "pillar": "Railway / Bus Terminal Indoor Security"
+    },
+    {
+        "stream_id": "28", "cam_id": "CAM-28", "name": "28 Bilimora Concourse", "city": "Navsari", "district": "Navsari",
+        "lat": 20.7610, "lon": 72.9510, "type": "Indoor FRS Sentry", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "Illuminated indoor passage / corridor",
+        "ai_features": ["Indoor Missing Person / Criminal FRS", "Concourse Overcrowding & Stampede Sentry", "Public Asset Vandalism Detector"],
+        "pillar": "Railway / Bus Terminal Indoor Security"
+    },
+    {
+        "stream_id": "29", "cam_id": "CAM-29", "name": "29 Bilimora Waiting Hall", "city": "Navsari", "district": "Navsari",
+        "lat": 20.7620, "lon": 72.9520, "type": "Unattended Baggage AI", "dept": "City Police", "status": "ONLINE", "verified": True,
+        "scene": "Indoor waiting room with benches (12 AM)",
+        "ai_features": ["Unattended Baggage / Suspicious Object AI", "Overnight Unauthorized Loitering Alert", "Public Infrastructure Night Sentry"],
+        "pillar": "Railway / Bus Terminal Indoor Security"
+    },
+    {
+        "stream_id": "30", "cam_id": "CAM-30", "name": "30 Gandhidham Rambaugh", "city": "Kutch", "district": "Kutch",
+        "lat": 23.0750, "lon": 70.1330, "type": "Stray Animal Radar", "dept": "State Security", "status": "ONLINE", "verified": True,
+        "scene": "Urban circle with cars & stray cow on road",
+        "ai_features": ["Stray Animal / Cattle Collision Alert", "Roundabout Traffic Flow & Wrong Entry", "Kandla Port Freight Corridor Tracker"],
+        "pillar": "Rural 80,000 Edge Scale & Animal Hazard"
+    }
 ]
 
 GUJARAT_HIGHWAY_CORRIDORS = {
@@ -2653,6 +2929,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
     cctv_mode = st.selectbox(
         "🎛️ SELECT CCTV SURVEILLANCE & AI ANALYTICS MODE",
         [
+            "🏆 Grand Finale 5-Pillar Strategic Camera Matrix (24 Live Feeds)",
             "🟢 Verified & Perfectly Working Cameras (100% Tested Live Mesh)",
             "1. Single Camera Stream & Optical HUD Filters",
             "2. Dual-Camera Patrol Monitor (Cam 01 + Cam 14)",
@@ -2664,7 +2941,89 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         index=0
     )
 
-    if cctv_mode == "🟢 Verified & Perfectly Working Cameras (100% Tested Live Mesh)":
+    if cctv_mode == "🏆 Grand Finale 5-Pillar Strategic Camera Matrix (24 Live Feeds)":
+        st.markdown("""
+        <div class="soc-alert-box-blue" style="margin-bottom: 18px;">
+            <div class="soc-alert-title" style="display: flex; align-items: center; gap: 8px;">
+                <span>🏛️</span> <span>GUJARAT POLICE STATEWIDE CCTV GRID • 5 OPERATIONAL COMMAND PILLARS</span>
+            </div>
+            <div class="soc-alert-body">
+                Consolidated live stream feed directory across all 24 statewide cameras classified into 5 core law enforcement and public safety domains with domain-specific AI models active.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        selected_pillar = st.selectbox(
+            "Filter Feeds by Operational Grand Finale Pillar:",
+            [
+                "All 24 Statewide Feeds (Complete Grid)",
+                "🎯 Pillar 1: Highway & Checkpost ANPR Grid (Cam 09, 06, 14, 15)",
+                "🚦 Pillar 2: Smart Traffic & RLVD Safety (Cam 14, 15, 13, 02, 03, 04, 08)",
+                "🚌 Pillar 3: Public Transit & Transport Safety (Cam 18, 16, 05, 10)",
+                "🚆 Pillar 4: Railway / Bus Terminal Indoor Security (Cam 27, 28, 29 Bilimora, Cam 11)",
+                "🌾 Pillar 5: Rural 80,000 Edge Scale & Animal Hazard (Cam 19, 20, 23, 24, 30, 07)"
+            ],
+            index=0
+        )
+
+        if "Pillar 1" in selected_pillar:
+            filtered_cams = [c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) in ["9", "6", "14", "15"]]
+        elif "Pillar 2" in selected_pillar:
+            filtered_cams = [c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) in ["14", "15", "13", "2", "3", "4", "8"]]
+        elif "Pillar 3" in selected_pillar:
+            filtered_cams = [c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) in ["18", "16", "5", "10"]]
+        elif "Pillar 4" in selected_pillar:
+            filtered_cams = [c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) in ["27", "28", "29", "11"]]
+        elif "Pillar 5" in selected_pillar:
+            filtered_cams = [c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) in ["19", "20", "23", "24", "30", "7"]]
+        else:
+            filtered_cams = ACTIVE_CCTV_CATALOGUE
+
+        vk1, vk2, vk3, vk4 = st.columns(4)
+        with vk1: render_metric_card("Active Channels", f"{len(filtered_cams)} Feeds", "Operational Grid", color="blue")
+        with vk2: render_metric_card("AI Feature Load", f"{len(filtered_cams)*3} Models", "Parallel Edge Inference", color="green")
+        with vk3: render_metric_card("Stream Codec", "H.264 / AVC", "1080p Ultra-Low Latency", color="orange")
+        with vk4: render_metric_card("Bandwidth Efficiency", "99.2% Edge Saved", "Zero-Buffer Range Stream", color="green")
+
+        st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
+        for i in range(0, len(filtered_cams), 2):
+            c_row1, c_row2 = st.columns(2)
+            cam_a = filtered_cams[i]
+            with c_row1:
+                feats_a = " • ".join(cam_a.get("ai_features", ["High-Speed ANPR", "Live Telemetry"]))
+                scene_a = cam_a.get("scene", "Statewide Surveillance Corridor")
+                st.markdown(f"""
+                <div class="kpi-card kpi-card-blue" style="min-height: auto !important; padding: 10px 14px !important; margin-bottom: 8px !important;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span class="soc-badge soc-badge-online">NODE {cam_a['cam_id']}</span>
+                        <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A;">{cam_a['name']} ({cam_a['city']})</span>
+                        <span style="font-family: monospace; font-size: 0.75rem; color: #15803D; font-weight: bold;">● 30 FPS</span>
+                    </div>
+                    <div style="font-size: 0.76rem; color: #475569; margin-top: 4px;">📐 <b>Geometry:</b> {scene_a}</div>
+                    <div style="font-size: 0.74rem; color: #0369A1; font-weight: 700; margin-top: 2px;">⚡ <b>AI:</b> {feats_a}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                render_cctv_live_container(cam_a, height=260, border_color="rgba(186,230,253,0.9)")
+
+            if i + 1 < len(filtered_cams):
+                cam_b = filtered_cams[i+1]
+                with c_row2:
+                    feats_b = " • ".join(cam_b.get("ai_features", ["High-Speed ANPR", "Live Telemetry"]))
+                    scene_b = cam_b.get("scene", "Statewide Surveillance Corridor")
+                    st.markdown(f"""
+                    <div class="kpi-card kpi-card-blue" style="min-height: auto !important; padding: 10px 14px !important; margin-bottom: 8px !important;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span class="soc-badge soc-badge-online">NODE {cam_b['cam_id']}</span>
+                            <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A;">{cam_b['name']} ({cam_b['city']})</span>
+                            <span style="font-family: monospace; font-size: 0.75rem; color: #15803D; font-weight: bold;">● 30 FPS</span>
+                        </div>
+                        <div style="font-size: 0.76rem; color: #475569; margin-top: 4px;">📐 <b>Geometry:</b> {scene_b}</div>
+                        <div style="font-size: 0.74rem; color: #0369A1; font-weight: 700; margin-top: 2px;">⚡ <b>AI:</b> {feats_b}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    render_cctv_live_container(cam_b, height=260, border_color="rgba(186,230,253,0.9)")
+
+    elif cctv_mode == "🟢 Verified & Perfectly Working Cameras (100% Tested Live Mesh)":
         st.markdown("### 🟢 Verified & Perfectly Working Cameras (100% Tested Streams)")
         st.caption("These checkpost cameras have been tested for 100% active HLS/MP4 streams, low latency, high optical clarity, and zero buffering.")
 
