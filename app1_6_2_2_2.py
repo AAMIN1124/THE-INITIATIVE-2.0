@@ -3863,23 +3863,29 @@ elif nav_section == "Facial Recognition & CCTNS Missing Person Search (FRS/NAFIS
                     ''', unsafe_allow_html=True)
 
                     # Export Section 65B FRS Dossier
-                    dossier_meta = {
-                        "Suspect Name": matched_suspect["person_name"],
-                        "Alias": matched_suspect["alias"],
-                        "FIR No": matched_suspect["fir_no"],
-                        "Police Station": matched_suspect["police_station"],
-                        "Sections": matched_suspect["sections"],
-                        "NAFIS Biometric Match": f"{sim_score}%",
-                        "Last Sighted Camera": matched_suspect["last_known_location"],
-                        "Verification Authority": prof["name"] + f" ({prof['badge_id']})"
-                    }
-                    pdf_dossier_bytes = generate_official_reportlab_pdf(
-                        title="OFFICIAL SECTION 65B FRS BIOMETRIC IDENTIFICATION DOSSIER",
-                        summary_meta=dossier_meta,
-                        detection_list=[],
-                        officer_name=prof["name"],
-                        badge_id=prof["badge_id"],
-                        station=prof["station"]
+                    df_frs_event = pd.DataFrame([{
+                        "Event ID": f"FRS-{matched_suspect['id']:03d}",
+                        "Entry Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Exit Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Peak Clarity Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Vehicle Type": "PERSON / SUSPECT",
+                        "Consensus Plate / Details": f"Suspect: {matched_suspect['person_name']} (Alias: {matched_suspect['alias']})",
+                        "Match Confidence": f"{sim_score}%",
+                        "eGujCop Status": f"{matched_suspect['status']} - {matched_suspect['fir_no']}",
+                        "Checkpost Location": matched_suspect['last_known_location']
+                    }])
+                    pdf_dossier_bytes = generate_scrb_pdf_report(
+                        df_frs_event,
+                        case_id=matched_suspect["fir_no"],
+                        officer=prof["name"],
+                        checkpost_source=matched_suspect["last_known_location"]
+                    )
+                    st.download_button(
+                        label="📄 EXPORT OFFICIAL SECTION 65B FRS DOSSIER (PDF with 2D QR & SHA-256)",
+                        data=pdf_dossier_bytes,
+                        file_name=f"SECTION_65B_FRS_{matched_suspect['person_name'].replace(' ', '_')}_{int(time.time())}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
                     )
                     st.download_button(
                         label="📄 EXPORT OFFICIAL SECTION 65B FRS DOSSIER (PDF with 2D QR & SHA-256)",
