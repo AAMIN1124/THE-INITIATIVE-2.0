@@ -60,14 +60,18 @@ st.set_page_config(
 if "GLOBAL_SIGHTINGS_BUFFER" not in globals():
     GLOBAL_SIGHTINGS_BUFFER = []
 if "GLOBAL_SIGHTINGS_LOCK" not in globals():
-    GLOBAL_SIGHTINGS_LOCK = threading.Lock()
+    GLOBAL_SIGHTINGS_LOCK = threading.RLock()
 
-# Granular Decoupled Inference Locks to Eliminate Lock Contention
+# Granular Decoupled & Unified Thread-Safe Inference Locks
+if "UNIFIED_AI_LOCK" not in globals():
+    UNIFIED_AI_LOCK = threading.RLock()
 if "YOLO_INFERENCE_LOCK" not in globals():
-    YOLO_INFERENCE_LOCK = threading.Lock()
+    YOLO_INFERENCE_LOCK = UNIFIED_AI_LOCK
 if "OCR_INFERENCE_LOCK" not in globals():
-    OCR_INFERENCE_LOCK = threading.Lock()
+    OCR_INFERENCE_LOCK = UNIFIED_AI_LOCK
 
+if "DAEMON_REGISTRY_LOCK" not in globals():
+    DAEMON_REGISTRY_LOCK = threading.RLock()
 if "ACTIVE_DAEMON_THREADS" not in globals():
     ACTIVE_DAEMON_THREADS = {}
 if "DAEMON_STOP_EVENTS" not in globals():
@@ -1444,7 +1448,8 @@ st.markdown("""
 def render_header(module_name, officer_name=None):
     prof = st.session_state.officer_profile
     display_name = officer_name or prof.get("name", "Officer Aamin")
-    daemon_count = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
+    with DAEMON_REGISTRY_LOCK:
+        daemon_count = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
     daemon_badge = f"🟢 {daemon_count} DAEMONS INGESTING" if daemon_count > 0 else "⚪ DAEMONS IDLE"
     
     is_edge = st.session_state.get("edge_bandwidth_mode", False)
@@ -1988,24 +1993,87 @@ def is_domain_resolvable(url, timeout_sec=0.4):
         DNS_CACHE[hostname] = (False, now + 45.0)
         return False
 
+def run_unified_ai_inference(yolo_model, ocr_reader, frame, imgsz=256, conf=0.35):
+    """
+    Unified thread-safe AI inference execution wrapper.
+    Eliminates lock starvation and thread contention during simultaneous background & foreground detections.
+    """
+    if frame is None or frame.size == 0:
+        return []
+    
+    fh, fw = frame.shape[:2]
+    detected_items = []
+    
+    with UNIFIED_AI_LOCK:
+        try:
+            results = yolo_model(frame, verbose=False, imgsz=imgsz, conf=conf)
+        except Exception:
+            return []
+
+        for r in results:
+            for box in r.boxes:
+                cls = int(box.cls[0])
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                conf_val = float(box.conf[0])
+                
+                v_crop = None
+                p_text = ""
+                ocr_conf = 0.0
+                
+                if cls in [2, 3, 5, 7]:
+                    vh, vw = y2 - y1, x2 - x1
+                    if vh > 30 and vw > 30:
+                        v_crop = frame[max(0, y1):min(fh, y2), max(0, x1):min(fw, x2)]
+                        try:
+                            ocr_hits = run_strict_ocr_on_crop(ocr_reader, v_crop)
+                            if ocr_hits:
+                                top_p, top_c, _ = ocr_hits[0]
+                                p_text = format_dynamic_plate(top_p)
+                                ocr_conf = top_c
+                        except Exception:
+                            pass
+                            
+                detected_items.append({
+                    "cls": cls,
+                    "box": (x1, y1, x2, y2),
+                    "conf": conf_val,
+                    "plate": p_text,
+                    "ocr_conf": ocr_conf,
+                    "crop": v_crop
+                })
+                
+    return detected_items
+
 # ----------------- 100% GENUINE LIVE CCTV STREAM RENDERING ENGINE -----------------
 def get_active_stream_url(identifier):
+    """
+    Safely retrieves the active stream URL for dict, string, int, or custom IP streams.
+    Prevents AttributeError when passing string IDs.
+    """
+    if not identifier:
+        return "https://live.corp8.cloud/stream/14"
+        
     if isinstance(identifier, dict):
-        st_id = str(identifier.get("stream_id", identifier.get("cam_id", identifier.get("camera_id", "1"))))
-        if "-" in st_id:
-            st_id = st_id.split("-")[-1]
         if identifier.get("custom_url"):
-            return identifier["custom_url"].strip()
+            return str(identifier["custom_url"]).strip()
+        st_id = str(identifier.get("stream_id", identifier.get("cam_id", identifier.get("camera_id", "14"))))
     else:
         st_id = str(identifier).strip()
-        if "-" in st_id:
-            st_id = st_id.split("-")[-1]
+        if st_id.startswith(("http://", "https://", "rtsp://", "rtsps://")):
+            return st_id
+
+    if "-" in st_id:
+        st_id = st_id.split("-")[-1]
         
-    overrides = st.session_state.get("stream_overrides", {})
-    if st_id in overrides and overrides[st_id].strip():
-        return overrides[st_id].strip()
+    try:
+        overrides = st.session_state.get("stream_overrides", {}) if hasattr(st, "session_state") else {}
+    except Exception:
+        overrides = {}
+        
+    if st_id in overrides and str(overrides[st_id]).strip():
+        return str(overrides[st_id]).strip()
     if st_id == "JURY" and "JURY" in overrides:
-        return overrides["JURY"].strip()
+        return str(overrides["JURY"]).strip()
     
     clean_num = str(int(st_id)) if st_id.isdigit() else st_id
     return f"https://live.corp8.cloud/stream/{clean_num}"
@@ -2086,9 +2154,22 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
     2. Extracts hardware PTS via cv2.CAP_PROP_POS_MSEC (never wall-clock or FPS).
     3. Handles loop discontinuities gracefully without dropping connections.
     4. Auto-reconnects with exponential backoff (2.0s to 30.0s).
+    5. Strict try...finally lifecycle guaranteeing cv2.VideoCapture release and zero leaks.
     """
-    cam_id = str(cam_obj.get("cam_id", cam_obj.get("stream_id", "1")))
-    st_id = str(cam_obj.get("stream_id", "1"))
+    if isinstance(cam_obj, dict):
+        cam_id = str(cam_obj.get("cam_id", cam_obj.get("stream_id", "CAM-01")))
+        st_id = str(cam_obj.get("stream_id", "1"))
+        cam_name = cam_obj.get("name", "Checkpost")
+        cam_city = cam_obj.get("city", "Gujarat")
+        cam_lat = cam_obj.get("lat", 23.0)
+        cam_lon = cam_obj.get("lon", 72.5)
+    else:
+        st_id = str(cam_obj).strip()
+        cam_id = f"CAM-{int(st_id):02d}" if st_id.isdigit() else st_id
+        cam_name = f"Camera {st_id}"
+        cam_city = "Gujarat"
+        cam_lat, cam_lon = 23.0, 72.5
+        
     if "-" in st_id:
         st_id = st_id.split("-")[-1]
     clean_id = str(int(st_id)) if st_id.isdigit() else st_id
@@ -2105,7 +2186,7 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
 
     while not stop_event.is_set():
         stream_urls_to_try = [
-            cam_obj.get("custom_url", "").strip(),
+            cam_obj.get("custom_url", "").strip() if isinstance(cam_obj, dict) else "",
             get_active_stream_url(cam_obj),
             f"http://live.corp8.cloud/stream/{clean_id}",
             f"https://live.corp8.cloud/stream/{clean_id}",
@@ -2115,132 +2196,126 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
         stream_urls_to_try = [u for u in stream_urls_to_try if u]
         
         cap = None
-        for stream_url in stream_urls_to_try:
-            if stop_event.is_set():
-                break
-            try:
-                # Force RTSP over TCP & zero-buffer
-                os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
-                cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
-                if not cap.isOpened():
-                    cap = cv2.VideoCapture(stream_url)
-                if cap.isOpened():
-                    break
-                else:
-                    if cap is not None:
-                        cap.release()
-                        cap = None
-            except Exception:
-                cap = None
-
-        if cap is None or not cap.isOpened():
-            # Exponential backoff step
-            for _ in range(int(backoff_delay * 10)):
+        try:
+            for stream_url in stream_urls_to_try:
                 if stop_event.is_set():
                     break
-                time.sleep(0.1)
-            backoff_delay = min(max_backoff, backoff_delay * 2.0)
-            continue
+                try:
+                    # Force RTSP over TCP & zero-buffer
+                    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
+                    temp_cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
+                    if not temp_cap.isOpened():
+                        temp_cap = cv2.VideoCapture(stream_url)
+                    if temp_cap.isOpened():
+                        cap = temp_cap
+                        break
+                    else:
+                        if temp_cap is not None:
+                            temp_cap.release()
+                except Exception:
+                    pass
 
-        # Connected successfully -> reset backoff delay
-        backoff_delay = 2.0
-        last_known_pts_ms = 0.0
-
-        while not stop_event.is_set():
-            ret, frame = cap.read()
-            if not ret or frame is None or frame.size == 0:
-                break
-
-            now = time.time()
-            if now - last_sample_time < sample_interval:
-                time.sleep(0.01)
+            if cap is None or not cap.isOpened():
+                # Exponential backoff step
+                for _ in range(int(backoff_delay * 10)):
+                    if stop_event.is_set():
+                        break
+                    time.sleep(0.1)
+                backoff_delay = min(max_backoff, backoff_delay * 2.0)
                 continue
 
-            last_sample_time = now
-            fh, fw = frame.shape[:2]
+            # Connected successfully -> reset backoff delay
+            backoff_delay = 2.0
+            last_known_pts_ms = 0.0
 
-            # Timing & PTS Compliance: Extract hardware PTS via cv2.CAP_PROP_POS_MSEC
-            raw_pts_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
-            
-            # Scene Discontinuity & GOP loop-jump handler
-            if raw_pts_ms is not None and raw_pts_ms > 0:
-                if raw_pts_ms < last_known_pts_ms - 2000:
-                    # Video stream looped or scene cut discontinuity
-                    last_known_pts_ms = raw_pts_ms
+            while not stop_event.is_set():
+                ret, frame = cap.read()
+                if not ret or frame is None or frame.size == 0:
+                    break
+
+                now = time.time()
+                if now - last_sample_time < sample_interval:
+                    time.sleep(0.01)
+                    continue
+
+                last_sample_time = now
+                fh, fw = frame.shape[:2]
+
+                # Timing & PTS Compliance: Extract hardware PTS via cv2.CAP_PROP_POS_MSEC
+                raw_pts_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+                
+                # Scene Discontinuity & GOP loop-jump handler
+                if raw_pts_ms is not None and raw_pts_ms > 0:
+                    if raw_pts_ms < last_known_pts_ms - 2000:
+                        # Video stream looped or scene cut discontinuity
+                        last_known_pts_ms = raw_pts_ms
+                    else:
+                        last_known_pts_ms = raw_pts_ms
+                    sec_pts = last_known_pts_ms / 1000.0
                 else:
-                    last_known_pts_ms = raw_pts_ms
-                sec_pts = last_known_pts_ms / 1000.0
-            else:
-                last_known_pts_ms += (sample_interval * 1000.0)
-                sec_pts = last_known_pts_ms / 1000.0
+                    last_known_pts_ms += (sample_interval * 1000.0)
+                    sec_pts = last_known_pts_ms / 1000.0
 
-            pts_str = format_exact_pts(sec_pts)
+                pts_str = format_exact_pts(sec_pts)
 
-            try:
-                with YOLO_INFERENCE_LOCK:
-                    res = yolo_model(frame, verbose=False, imgsz=256, conf=0.35)
-                    
-                for r in res:
-                    for box in r.boxes:
-                        cls = int(box.cls[0])
-                        if cls in [2, 3, 5, 7]:
-                            x1, y1, x2, y2 = map(int, box.xyxy[0])
-                            vh, vw = y2 - y1, x2 - x1
-                            if vh > 35 and vw > 35:
-                                x1_c, y1_c = max(0, x1), max(0, y1)
-                                x2_c, y2_c = min(fw, x2), min(fh, y2)
-                                v_crop = frame[y1_c:y2_c, x1_c:x2_c]
-                                
-                                ocr_hits = run_strict_ocr_on_crop(ocr_reader, v_crop)
-                                if ocr_hits:
-                                    top_p, top_c, _ = ocr_hits[0]
-                                    formatted_plate = format_dynamic_plate(top_p)
+                # Unified Thread-Safe Inference Execution
+                detected_items = run_unified_ai_inference(yolo_model, ocr_reader, frame, imgsz=256, conf=0.35)
+                
+                for item in detected_items:
+                    cls = item["cls"]
+                    if cls in [2, 3, 5, 7]:
+                        top_p = item["plate"]
+                        top_c = item["ocr_conf"]
+                        conf_val = item["conf"]
+                        
+                        if top_p:
+                            formatted_plate = top_p
+                            egujcop_match = lookup_egujcop_record(top_p)
+                            egujcop_tag = f"CRITICAL eGujCop HIT: {egujcop_match['fir_no']} ({egujcop_match['offence']})" if egujcop_match else "Clear (No Active CCTNS Warrant)"
 
-                                    egujcop_match = lookup_egujcop_record(top_p)
-                                    egujcop_tag = f"CRITICAL eGujCop HIT: {egujcop_match['fir_no']} ({egujcop_match['offence']})" if egujcop_match else "Clear (No Active CCTNS Warrant)"
+                            track_counter += 1
+                            event_payload = {
+                                "Event ID": f"DAEMON-{cam_id}-{track_counter:03d}",
+                                "Entry Time": pts_str,
+                                "Exit Time": pts_str,
+                                "Peak Clarity Time": pts_str,
+                                "Duration": f"{round(sec_pts, 1)}s (PTS)",
+                                "PTS Seconds": sec_pts,
+                                "Vehicle Type": CLASS_NAMES.get(cls, "Vehicle"),
+                                "Vehicle Class": CLASS_NAMES.get(cls, "Vehicle"),
+                                "Event Type": "LIVE STREAM SIGHTING",
+                                "Consensus Plate / Details": f"License Plate: [{formatted_plate}]",
+                                "Detected Plate": formatted_plate,
+                                "Match Confidence": f"{round(top_c * 100, 1)}%",
+                                "YOLO Confidence": f"{round(float(conf_val) * 100, 1)}%",
+                                "OCR Confidence": f"{round(top_c * 100, 1)}%",
+                                "Checkpost Location": f"{cam_id}: {cam_name} ({cam_city})",
+                                "City": cam_city,
+                                "Lat": cam_lat,
+                                "Lon": cam_lon,
+                                "Plate_Clean": clean_str(top_p),
+                                "eGujCop Status": egujcop_tag,
+                                "Source": f"Background Ingest ({cam_id})"
+                            }
 
-                                    track_counter += 1
-                                    event_payload = {
-                                        "Event ID": f"DAEMON-{cam_id}-{track_counter:03d}",
-                                        "Entry Time": pts_str,
-                                        "Exit Time": pts_str,
-                                        "Peak Clarity Time": pts_str,
-                                        "Duration": f"{round(sec_pts, 1)}s (PTS)",
-                                        "PTS Seconds": sec_pts,
-                                        "Vehicle Type": CLASS_NAMES.get(cls, "Vehicle"),
-                                        "Vehicle Class": CLASS_NAMES.get(cls, "Vehicle"),
-                                        "Event Type": "LIVE STREAM SIGHTING",
-                                        "Consensus Plate / Details": f"License Plate: [{formatted_plate}]",
-                                        "Detected Plate": formatted_plate,
-                                        "Match Confidence": f"{round(top_c * 100, 1)}%",
-                                        "YOLO Confidence": f"{round(float(box.conf[0]) * 100, 1)}%",
-                                        "OCR Confidence": f"{round(top_c * 100, 1)}%",
-                                        "Checkpost Location": f"{cam_id}: {cam_obj.get('name', 'Checkpost')} ({cam_obj.get('city', 'Gujarat')})",
-                                        "City": cam_obj.get('city', 'Gujarat'),
-                                        "Lat": cam_obj.get('lat', 23.0),
-                                        "Lon": cam_obj.get('lon', 72.5),
-                                        "Plate_Clean": clean_str(top_p),
-                                        "eGujCop Status": egujcop_tag,
-                                        "Source": f"Background Ingest ({cam_id})"
-                                    }
+                            with GLOBAL_SIGHTINGS_LOCK:
+                                is_duplicate = False
+                                for prev_s in GLOBAL_SIGHTINGS_BUFFER[-15:]:
+                                    if prev_s.get("Plate_Clean") == clean_str(top_p) and prev_s.get("Checkpost Location") == event_payload["Checkpost Location"]:
+                                        is_duplicate = True
+                                        break
+                                if not is_duplicate:
+                                    GLOBAL_SIGHTINGS_BUFFER.append(event_payload)
+                                    log_sighting_to_db(event_payload)
 
-                                    with GLOBAL_SIGHTINGS_LOCK:
-                                        is_duplicate = False
-                                        for prev_s in GLOBAL_SIGHTINGS_BUFFER[-15:]:
-                                            if prev_s.get("Plate_Clean") == clean_str(top_p) and prev_s.get("Checkpost Location") == event_payload["Checkpost Location"]:
-                                                is_duplicate = True
-                                                break
-                                        if not is_duplicate:
-                                            GLOBAL_SIGHTINGS_BUFFER.append(event_payload)
-                                            log_sighting_to_db(event_payload)
-            except Exception:
-                pass
-
-            time.sleep(0.01)
-            
-        if cap is not None:
-            try: cap.release()
-            except Exception: pass
+                time.sleep(0.01)
+        finally:
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+                cap = None
 
         # Reconnection delay on stream drop
         if not stop_event.is_set():
@@ -2251,30 +2326,35 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
             backoff_delay = min(max_backoff, backoff_delay * 2.0)
 
 def start_camera_daemon(cam_obj):
-    cid = cam_obj.get("cam_id", cam_obj.get("stream_id", "CAM-01"))
-    if cid in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS[cid].is_alive():
-        return
-    
-    alive_cids = [c for c, t in list(ACTIVE_DAEMON_THREADS.items()) if t.is_alive()]
-    if len(alive_cids) >= MAX_CONCURRENT_DAEMONS:
-        oldest_cid = alive_cids[0]
-        stop_camera_daemon(oldest_cid)
-        time.sleep(0.05)
+    cid = cam_obj.get("cam_id", cam_obj.get("stream_id", "CAM-01")) if isinstance(cam_obj, dict) else str(cam_obj)
+    with DAEMON_REGISTRY_LOCK:
+        if cid in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS[cid].is_alive():
+            return
+        
+        alive_cids = [c for c, t in list(ACTIVE_DAEMON_THREADS.items()) if t.is_alive()]
+        if len(alive_cids) >= MAX_CONCURRENT_DAEMONS:
+            oldest_cid = alive_cids[0]
+            if oldest_cid in DAEMON_STOP_EVENTS:
+                DAEMON_STOP_EVENTS[oldest_cid].set()
+            if oldest_cid in ACTIVE_DAEMON_THREADS:
+                del ACTIVE_DAEMON_THREADS[oldest_cid]
+            time.sleep(0.05)
 
-    stop_event = threading.Event()
-    DAEMON_STOP_EVENTS[cid] = stop_event
-    t = threading.Thread(target=background_rtsp_ingest_worker, args=(cam_obj, stop_event, 1.8), daemon=True)
-    ACTIVE_DAEMON_THREADS[cid] = t
-    t.start()
+        stop_event = threading.Event()
+        DAEMON_STOP_EVENTS[cid] = stop_event
+        t = threading.Thread(target=background_rtsp_ingest_worker, args=(cam_obj, stop_event, 1.8), daemon=True)
+        ACTIVE_DAEMON_THREADS[cid] = t
+        t.start()
 
 def stop_camera_daemon(cid):
-    if cid in DAEMON_STOP_EVENTS:
-        DAEMON_STOP_EVENTS[cid].set()
-    if cid in ACTIVE_DAEMON_THREADS:
-        try:
-            del ACTIVE_DAEMON_THREADS[cid]
-        except Exception:
-            pass
+    with DAEMON_REGISTRY_LOCK:
+        if cid in DAEMON_STOP_EVENTS:
+            DAEMON_STOP_EVENTS[cid].set()
+        if cid in ACTIVE_DAEMON_THREADS:
+            try:
+                del ACTIVE_DAEMON_THREADS[cid]
+            except Exception:
+                pass
 
 # ----------------- GUJARAT HIGHWAY TOPOLOGY CORRIDOR ROUTING -----------------
 def compute_predictive_trajectory(sightings_list):
@@ -2704,8 +2784,9 @@ col_d1, col_d2 = st.sidebar.columns(2)
 cam14_obj = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == "14"), ACTIVE_CCTV_CATALOGUE[0])
 cam01_obj = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == "1"), ACTIVE_CCTV_CATALOGUE[0])
 
-is_c14_running = "CAM-14" in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS["CAM-14"].is_alive()
-is_c01_running = "CAM-01" in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS["CAM-01"].is_alive()
+with DAEMON_REGISTRY_LOCK:
+    is_c14_running = "CAM-14" in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS["CAM-14"].is_alive()
+    is_c01_running = "CAM-01" in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS["CAM-01"].is_alive()
 
 if col_d1.button("🟢 CAM-14" if not is_c14_running else "🛑 CAM-14", key="btn_d_c14", use_container_width=True):
     if not is_c14_running:
@@ -2725,7 +2806,8 @@ if col_d2.button("🟢 CAM-01" if not is_c01_running else "🛑 CAM-01", key="bt
         st.sidebar.info("Cam-01 Ingest Stopped")
     st.rerun()
 
-daemon_active_cnt = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
+with DAEMON_REGISTRY_LOCK:
+    daemon_active_cnt = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
 st.sidebar.caption(f"**Ingest Status:** {daemon_active_cnt}/{MAX_CONCURRENT_DAEMONS} Active | Buffer: {len(st.session_state.get('all_cctv_sightings', []))} Sighting(s)")
 
 with st.sidebar.expander("🔗 Dynamic External Stream Ingest (Jury URL/IP)", expanded=False):
@@ -3831,7 +3913,8 @@ elif nav_section == "Cross-Camera Suspect Re-ID Tracker":
     st.markdown("### Statewide Multi-Camera Vehicle Trajectory Re-Identification & Highway Corridor Router")
     st.caption("Stitches genuine checkpost sightings logged in SQLite, computes real-time vehicle velocity/bearing vectors, and predicts upcoming intercept checkpoints along major Gujarat Highway Corridors.")
 
-    daemon_count = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
+    with DAEMON_REGISTRY_LOCK:
+        daemon_count = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
     t_c1, t_c2, t_c3 = st.columns([1.5, 1, 1])
     with t_c1:
         if daemon_count > 0:
