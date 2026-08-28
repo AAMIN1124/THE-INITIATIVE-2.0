@@ -2882,17 +2882,13 @@ with st.sidebar.expander("🔗 Dynamic External Stream Ingest (Jury URL/IP)", ex
 nav_section = st.sidebar.radio(
     "OPERATIONAL MODULES",
     [
-        "Command Overview Dashboard",
         "Officer Profile & Credentials",
         "Gujarat 25 CCTV Live Network",
         "Cross-Camera Suspect Re-ID Tracker",
-        "Automated Crash & Accident 108 AI",
-        "Police Drone & Body-Cam Feeds",
         "Predictive Crime Hotspot AI Map",
         "Active Incident Alerts & Dispatch",
         "CCTV Video Forensic Engine (PTS & ANPR)",
         "Facial Recognition & CCTNS Missing Person Search (FRS/NAFIS)",
-        "Integrated Webcam Field Patrol",
         "Mobile Phone IP Camera Scanner",
         "Gujarat GIS Suspect Route Tracker",
         "Statewide CCTV Asset Registry & Gap Analysis",
@@ -2900,7 +2896,7 @@ nav_section = st.sidebar.radio(
         "Section 65B SCRB Forensic Dossier",
         "Server Health & Audit Logs"
     ],
-    index=8
+    index=1
 )
 
 st.sidebar.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
@@ -2960,78 +2956,7 @@ if nav_section == "Officer Profile & Credentials":
                 time.sleep(0.4)
                 st.rerun()
 
-# ----------------- MODULE 1: COMMAND OVERVIEW DASHBOARD -----------------
-elif nav_section == "Command Overview Dashboard":
-    render_header("Command Overview Dashboard", prof["name"])
-
-    if st.session_state.get("edge_bandwidth_mode", False):
-        st.markdown("""
-        <div class="soc-alert-box-orange">
-            <div class="soc-alert-title" style="color: #C2410C;">⚡ EDGE OPTIMIZATION ACTIVE (80,000 CAMERA SCALE SIMULATOR)</div>
-            <div class="soc-alert-body" style="color: #7C2D12;">
-                • <b>Edge Architecture:</b> In-camera edge compute extracting cropped plate tensors (<50 KB) + millisecond PTS metadata.<br/>
-                • <b>Network Reduction:</b> Transmitting ~50 KB per sighting vs 8.4 Mbps raw video = <b>94.2% statewide bandwidth conserved</b> across 80,000 nodes.<br/>
-                • <b>Rural Reliability:</b> Allows real-time suspect ANPR intercept even over 2G/3G rural police wireless links.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        render_metric_card("Live Mesh Status", f"{len(ACTIVE_CCTV_CATALOGUE)} / {len(ACTIVE_CCTV_CATALOGUE)} Online", "100% Core Mesh Availability", color="green")
-    with k2:
-        tracked_count = len(st.session_state.get("all_cctv_sightings", []))
-        render_metric_card("Forensic Intercepts", f"{tracked_count} Waypoints", "Recorded in Statewide Buffer", color="red")
-    with k3:
-        if st.session_state.get("edge_bandwidth_mode", False):
-            render_metric_card("Bandwidth Saved", "94.2%", "50 KB Edge Metadata vs 8.4 Mbps", color="orange")
-        else:
-            render_metric_card("System Compute Load", f"{psutil.cpu_percent()}% CPU", f"{psutil.virtual_memory().percent}% RAM Utilization", color="orange")
-    with k4:
-        render_metric_card("Network Latency", "12 ms", "Gateway: live.corp8.cloud", color="blue")
-
-    st.markdown("### Operational Quick Actions")
-    q1, q2, q3 = st.columns(3)
-    with q1:
-        st.markdown("""
-        <div class="action-card action-card-green">
-            <div>
-                <div class="kpi-label">Forensic Intelligence</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: #0F172A; margin-bottom: 6px;">Cross-Cam Suspect Re-ID</div>
-                <div style="font-size: 0.84rem; color: #475569;">Stitch genuine multi-camera journeys and predict upcoming intercept checkpoints along Gujarat Highway Corridors.</div>
-            </div>
-            <div style="font-size: 0.76rem; font-weight: 700; color: #15803D;">● MODULE ACTIVE</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with q2:
-        st.markdown("""
-        <div class="action-card action-card-orange">
-            <div>
-                <div class="kpi-label">Statewide Video Wall</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: #0F172A; margin-bottom: 6px;">5-Camera Command Wall</div>
-                <div style="font-size: 0.84rem; color: #475569;">Simultaneous multi-stream monitoring with Top 5 Strategic AI Patrol Hub and optical glare reduction filters.</div>
-            </div>
-            <div style="font-size: 0.76rem; font-weight: 700; color: #C2410C;">● 5/5 CHANNELS SYNCED</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with q3:
-        st.markdown("""
-        <div class="action-card action-card-red">
-            <div>
-                <div class="kpi-label">eGujCop Watchlist Sync</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: #0F172A; margin-bottom: 6px;">CCTNS & FIR Intercept</div>
-                <div style="font-size: 0.84rem; color: #475569;">Instant cross-reference of license plates against statewide FIR stolen vehicle records and non-bailable warrants.</div>
-            </div>
-            <div style="font-size: 0.76rem; font-weight: 700; color: #BE123C;">● eGujCop SYNC ACTIVE</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("### Active Surveillance Mesh Overview")
-    df_preview = pd.DataFrame(ACTIVE_CCTV_CATALOGUE)[["cam_id", "name", "city", "type", "dept", "status"]]
-    df_preview.columns = ["Camera ID", "Location Name", "City", "Camera Type", "Jurisdiction", "Status"]
-    st.dataframe(df_preview, use_container_width=True)
-
-# ----------------- MODULE 2: GUJARAT 25 CCTV LIVE NETWORK -----------------
+# ----------------- MODULE: GUJARAT 25 CCTV LIVE NETWORK -----------------
 elif nav_section == "Gujarat 25 CCTV Live Network":
     render_header("Gujarat 25 CCTV Live Network", prof["name"])
 
@@ -4058,75 +3983,6 @@ elif nav_section == "Cross-Camera Suspect Re-ID Tracker":
         else:
             st.info(f"No sightings recorded for vehicle [{reid_query}] in active mesh buffer or SQLite database.")
 
-# ----------------- MODULE: AUTOMATED CRASH & ACCIDENT 108 AI -----------------
-elif nav_section == "Automated Crash & Accident 108 AI":
-    render_header("Automated Crash & Accident Emergency 108 AI", prof["name"])
-
-    st.markdown("### Computer Vision Road Accident & Collision Response Center")
-    st.caption("Detects sudden vehicle impacts, rollovers, and pedestrian collisions with automated emergency 108 ambulance dispatch.")
-
-    c_ac1, c_ac2, c_ac3, c_ac4 = st.columns(4)
-    with c_ac1: render_metric_card("Collision Radar", "ACTIVE", "YOLOv8 Crash Detector", color="red")
-    with c_ac2: render_metric_card("108 Response Time", "4.2 Mins", "Golden Hour Priority", color="green")
-    with c_ac3: render_metric_card("PCR Patrol Green Wave", "READY", "Automated Lane Clearance", color="blue")
-    with c_ac4: render_metric_card("Simulated Incidents", "01 Active", "Under Investigation", color="orange")
-
-    st.markdown("#### Live Junction Collision Surveillance")
-    ac_col1, ac_col2 = st.columns([1.4, 1])
-
-    with ac_col1:
-        render_cctv_live_container('14', height=340, border_color="rgba(244,63,94,0.9)", is_dual_main=True)
-
-    with ac_col2:
-        st.markdown("""
-        <div class="soc-alert-box-red">
-            <div class="soc-alert-title" style="color: #9F1239;">🚨 POTENTIAL COLLISION IMPACT DETECTED</div>
-            <div class="soc-alert-body" style="color: #4C0519;">
-                • <b>Location:</b> Camera 14 — Delight Junction (Vadodara)<br/>
-                • <b>Severity:</b> Moderate Deceleration Anomaly (Auto-Rickshaw & Sedan)<br/>
-                • <b>Traffic Lane Block:</b> Right Turning Lane Impeded<br/>
-                • <b>Estimated Casualties:</b> 1-2 Injured
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        amb_link = generate_ambulance_108_dispatch_link("14 Delight Junction (Vadodara)", 22.3000, 73.1800, casualties=2)
-        if st.button("TRIGGER EMERGENCY 108 AMBULANCE SOS DISPATCH", type="primary", use_container_width=True):
-            trigger_audio_sos()
-            trigger_voice_dispatch("Emergency Alert: 108 Ambulance SOS dispatched to Delight Junction Vadodara.")
-            st.success("Emergency SOS transmitted to Vadodara 108 Ambulance Command & PCR Van #04.")
-            st.link_button("OPEN OFFICIAL EMERGENCY 108 DISPATCH WIRELESS (WHATSAPP)", amb_link, use_container_width=True)
-
-# ----------------- MODULE: POLICE DRONE & BODY-CAM FEEDS -----------------
-elif nav_section == "Police Drone & Body-Cam Feeds":
-    render_header("Police Drone & Body-Worn Camera (BWC) Feeds", prof["name"])
-
-    st.markdown("### Tactical Aerial & Mobile First-Responder Ingestion")
-    st.caption("Live low-latency video streaming from Police Tethered Drones and on-duty Patrol Officer Body Cameras.")
-
-    dr_col1, dr_col2 = st.columns(2)
-    with dr_col1:
-        st.markdown("""
-        <div class="kpi-card kpi-card-green" style="min-height: 50px !important; height: 50px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 10px 16px !important; margin-bottom: 10px !important;">
-            <span class="soc-badge soc-badge-online">DRONE-01 (AERIAL)</span>
-            <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A; margin-left: 8px;">Tethered Surveillance Drone (Ahmedabad Sector 4)</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-        render_cctv_live_container('1', height=320, border_color='rgba(34,197,94,0.8)')
-        st.info("● **Altitude:** 65 Meters | **Gimbal:** -45° Pitch | **Battery:** 88% (42 Mins Flight Time)")
-
-    with dr_col2:
-        st.markdown("""
-        <div class="kpi-card kpi-card-blue" style="min-height: 50px !important; height: 50px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 10px 16px !important; margin-bottom: 10px !important;">
-            <span class="soc-badge soc-badge-slate">BWC-PCR-14</span>
-            <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A; margin-left: 8px;">Body-Worn Camera: Head Constable R. Patel</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-        render_cctv_live_container('14', height=320, border_color='rgba(14,165,233,0.8)')
-        st.info("● **Officer:** HC R. Patel (Badge #8812) | **GPS:** 22.3000, 73.1800 | **Network:** 5G Police VPN")
-
 # ----------------- MODULE: PREDICTIVE CRIME HOTSPOT AI MAP -----------------
 elif nav_section == "Predictive Crime Hotspot AI Map":
     render_header("Predictive Crime Hotspot & Geofencing AI Map", prof["name"])
@@ -4612,117 +4468,7 @@ elif nav_section == "Facial Recognition & CCTNS Missing Person Search (FRS/NAFIS
     conn.close()
     st.dataframe(df_faces, use_container_width=True)
 
-# ----------------- MODULE 5: INTEGRATED WEBCAM FIELD PATROL -----------------
-elif nav_section == "Integrated Webcam Field Patrol":
-    render_header("Integrated Webcam Field Patrol", prof["name"])
-
-    target_plate_wb = st.text_input("Watchlist License Plate (Optional)", value="", placeholder="Enter target plate")
-
-    c_wb1, c_wb2 = st.columns(2)
-    if c_wb1.button("START LIVE WEBCAM FEED", type="primary", use_container_width=True):
-        st.session_state.wb_active = True
-    if c_wb2.button("STOP WEBCAM FEED", use_container_width=True):
-        st.session_state.wb_active = False
-
-    ALERT_WB = st.empty()
-    DISPATCH_BTN_WB = st.empty()
-    FRAME_WB = st.empty()
-    STATS_WB = st.empty()
-
-    if st.session_state.get("wb_active", False):
-        log_audit_trail(prof['name'], "Started Laptop Webcam")
-        yolo_model, ocr_reader = get_ai_models()
-        cap = open_hardware_webcam(0)
-
-        if cap is None or not cap.isOpened():
-            st.error("Hardware webcam device could not be accessed.")
-        else:
-            clean_tgt = clean_str(target_plate_wb)
-            frame_idx = 0
-            current_frame = 0
-            prev_t = time.time()
-            fps_val = 30.0
-            has_alerted_wb = False
-
-            try:
-                while st.session_state.get("wb_active", False):
-                    ret, frame = cap.read()
-                    if not ret or frame is None:
-                        st.error("Webcam video frame capture interrupted.")
-                        break
-
-                    frame_idx += 1
-                    cur_t = time.time()
-                    dt = cur_t - prev_t
-                    prev_t = cur_t
-                    if dt > 0:
-                        fps_val = round(0.9 * fps_val + 0.1 * (1.0 / dt), 1)
-
-                    fh, fw = frame.shape[:2]
-                    with YOLO_INFERENCE_LOCK:
-                        results = yolo_model(frame, verbose=False, imgsz=256, conf=0.35)
-                    v_cnt = 0
-                    p_cnt = 0
-                    target_hit = False
-
-                    for r in results:
-                        for box in r.boxes:
-                            cls = int(box.cls[0])
-                            x1, y1, x2, y2 = map(int, box.xyxy[0])
-                            if cls == 0:
-                                p_cnt += 1
-                                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 0), 2)
-                            elif cls in [2, 3, 5, 7]:
-                                v_cnt += 1
-                                vh, vw = y2 - y1, x2 - x1
-                                plate_label = "VEHICLE"
-                                is_match = False
-
-                                if frame_idx % 5 == 0 and vh > 35 and vw > 35:
-                                    v_crop = frame[max(0, y1):min(fh, y2), max(0, x1):min(fw, x2)]
-                                    ocr_res = run_strict_ocr_on_crop(ocr_reader, v_crop)
-                                    if ocr_res:
-                                        c_p, c_c, _ = ocr_res[0]
-                                        c_plate = format_dynamic_plate(c_p)
-                                        plate_label = f"PLATE: {c_plate}"
-                                        if clean_tgt:
-                                            is_match, _ = is_real_target_match(clean_tgt, c_plate)
-                                            if is_match:
-                                                target_hit = True
-                                
-                                if is_match or target_hit:
-                                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 4)
-                                    cv2.putText(frame, f"TARGET: {clean_tgt}", (x1, max(15, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
-                                else:
-                                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 0), 2)
-                                    cv2.putText(frame, plate_label, (x1, max(15, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 2)
-
-                    if target_hit and clean_tgt:
-                        trigger_audio_sos()
-                        if not has_alerted_wb:
-                            trigger_voice_dispatch(f"Watchlist vehicle {clean_tgt} intercepted in field webcam.")
-                            has_alerted_wb = True
-
-                        wa_link = generate_whatsapp_dispatch_link(clean_tgt, "Field Patrol Integrated Webcam", 23.0225, 72.5714)
-                        ALERT_WB.markdown(f"""
-                        <div class="soc-alert-box-red">
-                            <div class="soc-alert-title" style="color: #9F1239;">TARGET VEHICLE SPOTTED • {clean_tgt}</div>
-                            <div class="soc-alert-body" style="color: #4C0519;">Intercept detected in integrated patrol camera.</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        DISPATCH_BTN_WB.link_button("DISPATCH EMERGENCY WHATSAPP PATROL ALERT", wa_link, use_container_width=True)
-                    else:
-                        ALERT_WB.empty()
-                        DISPATCH_BTN_WB.empty()
-
-                    FRAME_WB.image(frame, channels="BGR", use_container_width=True)
-                    STATS_WB.info(f"Frame Rate: {fps_val} FPS | Tracked: {v_cnt} Vehicles, {p_cnt} Persons | Hardware: ONLINE")
-                    time.sleep(0.001)
-            finally:
-                if cap is not None:
-                    cap.release()
-
-# ----------------- MODULE 6: MOBILE PHONE IP CAMERA SCANNER -----------------
+# ----------------- MODULE: MOBILE PHONE IP CAMERA SCANNER -----------------
 elif nav_section == "Mobile Phone IP Camera Scanner":
     render_header("Mobile Phone IP Camera Scanner", prof["name"])
 
