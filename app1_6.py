@@ -384,6 +384,47 @@ def discover_live_cctv_endpoints(base_url="https://live.corp8.cloud/api/ingest",
     
     return []
 
+def capture_live_frame_from_stream(cam_dict):
+    """
+    Captures a clear live frame from video stream with multi-protocol fallback (HTTP -> HTTPS -> RTSP)
+    and a 6-frame GOP warmup loop to resolve OpenCV HTTPS handshake errors.
+    """
+    if isinstance(cam_dict, dict):
+        st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "14")))
+    else:
+        st_id = str(cam_dict).strip()
+    if "-" in st_id:
+        st_id = st_id.split("-")[-1]
+    clean_id = str(int(st_id)) if st_id.isdigit() else st_id
+
+    # Prioritize plain HTTP to bypass Python OpenSSL certificate issues on live.corp8.cloud
+    urls_to_try = [
+        f"http://live.corp8.cloud/stream/{clean_id}",
+        f"https://live.corp8.cloud/stream/{clean_id}",
+        f"rtsp://live.corp8.cloud:8554/stream/{clean_id}",
+        get_active_stream_url(cam_dict) if callable(globals().get("get_active_stream_url")) else f"https://live.corp8.cloud/stream/{clean_id}",
+        "http://live.corp8.cloud/stream/14"
+    ]
+
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;3000"
+
+    for u in urls_to_try:
+        try:
+            cap = cv2.VideoCapture(u, cv2.CAP_FFMPEG)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(u)
+            if cap.isOpened():
+                for _ in range(6):
+                    ret, frame = cap.read()
+                    if ret and frame is not None and frame.size > 0:
+                        cap.release()
+                        return True, frame
+                    time.sleep(0.05)
+                cap.release()
+        except Exception:
+            pass
+    return False, None
+
 # ----------------- EMBEDDED SQLITE MASTER DATABASE & REPOSITORY LAYER -----------------
 import sqlite3
 
@@ -3094,24 +3135,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         if run_live_inference:
             with st.spinner("Connecting to Live Stream & Running Neural Network Inference (YOLOv8 + OCR)..."):
                 yolo_model, ocr_reader = get_ai_models()
-                stream_link = get_active_stream_url(selected_cam)
-                
-                # Fetch live frame from stream URL with safe timeout
-                cap = cv2.VideoCapture(stream_link)
-                ret, frame = False, None
-                for _ in range(5):
-                    ret, frame = cap.read()
-                    if ret and frame is not None and frame.size > 0:
-                        break
-                    time.sleep(0.05)
-                cap.release()
-                
-                # Fallback to simulated high-res test frame if stream link temporarily unreachable
-                if not ret or frame is None or frame.size == 0:
-                    stream_link_fb = "https://live.corp8.cloud/stream/14"
-                    cap_fb = cv2.VideoCapture(stream_link_fb)
-                    ret, frame = cap_fb.read()
-                    cap_fb.release()
+                ret, frame = capture_live_frame_from_stream(selected_cam)
                 
                 if ret and frame is not None and frame.size > 0:
                     fh, fw = frame.shape[:2]
