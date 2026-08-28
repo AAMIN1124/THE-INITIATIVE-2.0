@@ -114,6 +114,138 @@ with GLOBAL_SIGHTINGS_LOCK:
         if item not in st.session_state["all_cctv_sightings"]:
             st.session_state["all_cctv_sightings"].append(item)
 
+# ----------------- STATIC & DYNAMIC CCTV DISCOVERY DEFINITIONS (PRE-INIT) -----------------
+GATEWAY_DISCOVERY_URL = os.environ.get("GATEWAY_DISCOVERY_URL", "https://live.corp8.cloud/api/ingest")
+DISCOVERY_CACHE = {"last_fetch": 0.0, "backoff": 2.0, "cameras": []}
+
+STATIC_CCTV_CATALOGUE = [
+    {"stream_id": "1", "cam_id": "CAM-01", "name": "01 Chiman bhai Bridge", "lat": 23.0450, "lon": 72.5710, "city": "Ahmedabad", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
+    {"stream_id": "2", "cam_id": "CAM-02", "name": "02 Janpath", "lat": 23.0300, "lon": 72.5600, "city": "Ahmedabad", "type": "High-Mast Bullet", "dept": "SCRB Highway", "status": "ONLINE", "verified": True},
+    {"stream_id": "3", "cam_id": "CAM-03", "name": "03 O.N.G.C. Office", "lat": 23.0900, "lon": 72.5900, "city": "Ahmedabad", "type": "Dome 360", "dept": "Smart City Mission", "status": "ONLINE", "verified": False},
+    {"stream_id": "4", "cam_id": "CAM-04", "name": "04 Paldi Circle", "lat": 23.0140, "lon": 72.5660, "city": "Ahmedabad", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
+    {"stream_id": "5", "cam_id": "CAM-05", "name": "05 Visat teen Rasta", "lat": 23.1050, "lon": 72.5950, "city": "Ahmedabad", "type": "4K ANPR PTZ", "dept": "SCRB Cyber Grid", "status": "ONLINE", "verified": False},
+    {"stream_id": "6", "cam_id": "CAM-06", "name": "06 Timbavadi gate-Junagadh", "lat": 21.5120, "lon": 70.4480, "city": "Junagadh", "type": "Secure Perimeter", "dept": "City Police", "status": "ONLINE", "verified": False},
+    {"stream_id": "7", "cam_id": "CAM-07", "name": "07 hero-showroom-gir-somnath", "lat": 20.9100, "lon": 70.4100, "city": "Somnath", "type": "Radar Speed Gun", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
+    {"stream_id": "8", "cam_id": "CAM-08", "name": "08 majewadi-gate-junagadh", "lat": 21.5220, "lon": 70.4570, "city": "Junagadh", "type": "4K ANPR PTZ", "dept": "City Police", "status": "ONLINE", "verified": False},
+    {"stream_id": "9", "cam_id": "CAM-09", "name": "09 new-bypass-circle-junagadh", "lat": 21.5350, "lon": 70.4700, "city": "Junagadh", "type": "Toll ANPR Barrier", "dept": "Highway Patrol", "status": "ONLINE", "verified": False},
+    {"stream_id": "10", "cam_id": "CAM-10", "name": "10 char-chowk-road-junagadh", "lat": 21.5180, "lon": 70.4520, "city": "Junagadh", "type": "Bullet Surveillance", "dept": "City Police", "status": "ONLINE", "verified": False},
+    {"stream_id": "11", "cam_id": "CAM-11", "name": "11 dolatpara-junagadh", "lat": 21.5400, "lon": 70.4650, "city": "Junagadh", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
+    {"stream_id": "12", "cam_id": "CAM-12", "name": "12 Tri Mandir Adalaj Tollnaka", "lat": 23.1600, "lon": 72.5800, "city": "Gandhinagar", "type": "High-Mast PTZ", "dept": "Highway Patrol", "status": "ONLINE", "verified": True},
+    {"stream_id": "13", "cam_id": "CAM-13", "name": "13 CN Vidhyalaya", "lat": 23.0250, "lon": 72.5450, "city": "Ahmedabad", "type": "Airport Security", "dept": "City Police", "status": "ONLINE", "verified": False},
+    {"stream_id": "14", "cam_id": "CAM-14", "name": "14 Delight Junction", "lat": 22.3000, "lon": 73.1800, "city": "Vadodara", "type": "Fixed ANPR Dual", "dept": "Highway Patrol", "status": "ONLINE", "verified": True},
+    {"stream_id": "15", "cam_id": "CAM-15", "name": "15 Suvidha park Checkpost", "lat": 22.2900, "lon": 70.7800, "city": "Rajkot", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
+    {"stream_id": "16", "cam_id": "CAM-16", "name": "16 Visat P2 Checkpost", "lat": 23.1100, "lon": 72.6000, "city": "Ahmedabad", "type": "City Dome Camera", "dept": "City Police", "status": "ONLINE", "verified": False},
+    {"stream_id": "17", "cam_id": "CAM-17", "name": "17 Rajkot Bus Port CCTV", "lat": 22.3050, "lon": 70.8020, "city": "Rajkot", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
+    {"stream_id": "18", "cam_id": "CAM-18", "name": "18 Rajkot City CCTV", "lat": 22.2800, "lon": 70.7900, "city": "Rajkot", "type": "Heritage PTZ", "dept": "City Police", "status": "ONLINE", "verified": False},
+    {"stream_id": "19", "cam_id": "CAM-19", "name": "19 Khaparia Panchayat, Navsari", "lat": 20.7634, "lon": 72.9554, "city": "Navsari", "type": "Port Heavy ANPR", "dept": "Rural Police", "status": "ONLINE", "verified": False},
+    {"stream_id": "20", "cam_id": "CAM-20", "name": "20 Mohanpura Junction", "lat": 23.5880, "lon": 72.3690, "city": "Mehsana", "type": "Border Surveillance", "dept": "Special Ops Group", "status": "ONLINE", "verified": False},
+    {"stream_id": "21", "cam_id": "CAM-21", "name": "21 Patan Dethali Char Rasta", "lat": 23.8500, "lon": 72.1300, "city": "Patan", "type": "4K ANPR PTZ", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
+    {"stream_id": "22", "cam_id": "CAM-22", "name": "22 BK Mervada tran Rasta", "lat": 24.1700, "lon": 72.4300, "city": "Banaskantha", "type": "Toll Barrier ANPR", "dept": "Highway Patrol", "status": "ONLINE", "verified": True},
+    {"stream_id": "23", "cam_id": "CAM-23", "name": "23 Kheram Checkpost", "lat": 22.5640, "lon": 72.9280, "city": "Anand", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": False},
+    {"stream_id": "24", "cam_id": "CAM-24", "name": "24 Dehgam Junction", "lat": 23.1670, "lon": 72.8120, "city": "Gandhinagar", "type": "Highway ANPR", "dept": "North Zone Patrol", "status": "ONLINE", "verified": False},
+    {"stream_id": "25", "cam_id": "CAM-25", "name": "25 Dhanori Checkpost", "lat": 20.9020, "lon": 72.9200, "city": "Navsari", "type": "Coastal Radar PTZ", "dept": "Marine Police", "status": "ONLINE", "verified": False},
+    {"stream_id": "26", "cam_id": "CAM-26", "name": "26 Ratanpur Border Checkpost", "lat": 23.8500, "lon": 73.1200, "city": "Sabarkantha", "type": "4K ANPR PTZ", "dept": "SCRB Highway", "status": "ONLINE", "verified": True},
+    {"stream_id": "27", "cam_id": "CAM-27", "name": "27 Mandvi Coastal Radar Checkpoint", "lat": 22.8300, "lon": 69.3500, "city": "Kutch", "type": "Coastal Radar PTZ", "dept": "Marine Police", "status": "ONLINE", "verified": True},
+    {"stream_id": "28", "cam_id": "CAM-28", "name": "28 Chhota Udaipur Transit Barrier", "lat": 22.3080, "lon": 74.0150, "city": "Chhota Udaipur", "type": "Fixed ANPR Dual", "dept": "Traffic Branch", "status": "ONLINE", "verified": True},
+    {"stream_id": "29", "cam_id": "CAM-29", "name": "29 Morbi Ceramic Highway Node", "lat": 22.8120, "lon": 70.8350, "city": "Morbi", "type": "High-Mast Bullet", "dept": "City Police", "status": "ONLINE", "verified": True},
+    {"stream_id": "30", "cam_id": "CAM-30", "name": "30 Somnath Temple Perimeter", "lat": 20.8880, "lon": 70.4010, "city": "Somnath", "type": "Dome 360", "dept": "State Security", "status": "ONLINE", "verified": True}
+]
+
+def generate_dynamic_discovery_grid():
+    """
+    Returns STATIC_CCTV_CATALOGUE as a robust fallback grid when offline or during initial startup.
+    """
+    grid = []
+    for c in STATIC_CCTV_CATALOGUE:
+        cid = c["cam_id"]
+        st_id = c["stream_id"]
+        grid.append({
+            "cam_id": cid,
+            "stream_id": st_id,
+            "name": c["name"],
+            "city": c["city"],
+            "district": c.get("district", c["city"]),
+            "lat": float(c["lat"]),
+            "lon": float(c["lon"]),
+            "type": c.get("type", "4K ANPR PTZ"),
+            "dept_code": c.get("dept", "Traffic Branch"),
+            "dept_name": f"Gujarat Police ({c.get('dept', 'Traffic Branch')})",
+            "dept": c.get("dept", "Traffic Branch"),
+            "resolution": "1080p",
+            "codec": "H.264 / AVC",
+            "fov_deg": 90.0,
+            "direction": "North",
+            "sla_status": "Active",
+            "sla_expiry_date": "2027-12-31",
+            "retention_days": 90,
+            "stream_primary": f"https://live.corp8.cloud/stream/{st_id}",
+            "stream_fallback": f"https://live.corp8.cloud/stream/2",
+            "status": "ONLINE",
+            "verified": c.get("verified", True)
+        })
+    return grid
+
+def discover_live_cctv_endpoints(base_url="https://live.corp8.cloud/api/ingest", timeout_sec=2.0):
+    """
+    Dynamic Endpoint Discovery: Queries live gateway endpoint (/api/ingest)
+    to fetch active camera streams and hardware specs with exponential backoff (2.0s to 30.0s).
+    """
+    url = base_url or GATEWAY_DISCOVERY_URL
+    now = time.time()
+    if not base_url and DISCOVERY_CACHE["cameras"] and (now - DISCOVERY_CACHE["last_fetch"] < 60.0):
+        return DISCOVERY_CACHE["cameras"]
+    
+    discovered_list = []
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "SCRB-Dynamic-Discovery/2.0",
+                "Accept": "application/json"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode('utf-8'))
+                raw_cams = data if isinstance(data, list) else data.get("cameras", data.get("streams", []))
+                for item in raw_cams:
+                    cid = str(item.get("id", item.get("stream_id", item.get("camera_id", "1"))))
+                    clean_id = cid.split("-")[-1] if "-" in cid else cid
+                    discovered_list.append({
+                        "cam_id": item.get("cam_id", f"CAM-{int(clean_id):02d}" if clean_id.isdigit() else f"CAM-{clean_id}"),
+                        "stream_id": clean_id,
+                        "name": item.get("name", item.get("location_name", f"Node {clean_id}")),
+                        "city": item.get("city", "Gujarat"),
+                        "district": item.get("district", item.get("city", "Gujarat")),
+                        "lat": float(item.get("lat", 23.0)),
+                        "lon": float(item.get("lon", 72.5)),
+                        "type": item.get("type", item.get("camera_type", "4K ANPR PTZ")),
+                        "dept_code": item.get("dept_code", "Traffic Branch"),
+                        "dept_name": item.get("dept_name", item.get("dept", "Gujarat Police (Traffic Branch)")),
+                        "dept": item.get("dept", item.get("dept_name", "Traffic Branch")),
+                        "resolution": item.get("resolution", "1080p"),
+                        "codec": item.get("codec", "H.264 / AVC"),
+                        "fov_deg": float(item.get("fov_deg", 90.0)),
+                        "direction": item.get("direction", "North"),
+                        "sla_status": item.get("sla_status", "Active"),
+                        "sla_expiry_date": item.get("sla_expiry_date", "2027-12-31"),
+                        "retention_days": int(item.get("retention_days", 90)),
+                        "stream_primary": item.get("stream_primary", f"https://live.corp8.cloud/stream/{clean_id}"),
+                        "stream_fallback": item.get("stream_fallback", "https://live.corp8.cloud/stream/2"),
+                        "status": item.get("status", "ONLINE"),
+                        "verified": bool(item.get("verified", True))
+                    })
+                if discovered_list:
+                    DISCOVERY_CACHE["cameras"] = discovered_list
+                    DISCOVERY_CACHE["last_fetch"] = now
+                    DISCOVERY_CACHE["backoff"] = 2.0
+                    return discovered_list
+    except Exception:
+        # Exponential backoff step on timeout
+        DISCOVERY_CACHE["backoff"] = min(30.0, DISCOVERY_CACHE["backoff"] * 2.0)
+    
+    return []
+
 # ----------------- EMBEDDED SQLITE MASTER DATABASE & REPOSITORY LAYER -----------------
 import sqlite3
 
@@ -3501,7 +3633,7 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                 if target_confirmed and clean_target_plate:
                     break
 
-                current_frame += step
+                current_frame += frame_step_factor
 
             cap.release()
             scan_progress.progress(1.0)
