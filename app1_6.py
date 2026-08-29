@@ -391,68 +391,85 @@ def discover_live_cctv_endpoints(base_url="https://live.corp8.cloud/api/ingest",
 
 def capture_live_frame_from_stream(cam_dict):
     """
-    1. Downloads a 1.5MB video chunk via urllib.request with a 2.0s timeout and byte range header.
-    2. Writes chunk to a NamedTemporaryFile.
-    3. Decodes the genuine 1080p live frame with cv2.VideoCapture.
-    4. Eliminates cartoon drawings completely.
+    Captures a genuine 1080p live frame STRICTLY from the specified camera endpoint:
+    1. Direct OpenCV VideoCapture over TCP/HTTP with low-delay zero-buffer options.
+    2. Raw byte-bounded HTTP chunk downloader via urllib.request.
+    3. Direct RTSP over TCP.
+    Never falls back to a different camera ID.
     """
     if isinstance(cam_dict, dict):
-        st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "14")))
+        custom_url = cam_dict.get("stream_url", cam_dict.get("custom_url", "")).strip()
+        st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "1")))
     else:
+        custom_url = ""
         st_id = str(cam_dict).strip()
+        
+    if "http" in st_id or "rtsp" in st_id:
+        custom_url = st_id
+
     clean_id = st_id.split("-")[-1] if "-" in st_id else st_id
     if clean_id.isdigit():
         clean_id = str(int(clean_id))
 
-    urls_to_try = [
-        f"http://live.corp8.cloud/stream/{clean_id}",
-        f"https://live.corp8.cloud/stream/{clean_id}",
-        f"http://live.corp8.cloud/stream/14",
-        f"http://live.corp8.cloud/stream/1",
-        f"http://live.corp8.cloud/stream/15"
-    ]
+    if custom_url:
+        target_urls = [
+            custom_url,
+            custom_url.replace("https://", "http://"),
+            custom_url.replace("http://", "https://")
+        ]
+    else:
+        target_urls = [
+            f"http://live.corp8.cloud/stream/{clean_id}",
+            f"https://live.corp8.cloud/stream/{clean_id}",
+            f"rtsp://live.corp8.cloud:8554/stream/{clean_id}"
+        ]
 
-    for stream_url in urls_to_try:
+    # 1. Direct OpenCV Stream Ingest
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
+    for u in target_urls:
         try:
-            req = urllib.request.Request(
-                stream_url, 
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Range": "bytes=0-1500000"}
-            )
-            with urllib.request.urlopen(req, timeout=2.0) as response:
-                chunk = response.read(1500000)
-                if len(chunk) > 10000:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-                        tmp.write(chunk)
-                        tmp_path = tmp.name
-                    
-                    cap = cv2.VideoCapture(tmp_path)
-                    if cap.isOpened():
-                        for _ in range(4):
-                            ret, frame = cap.read()
-                            if ret and frame is not None and frame.size > 0:
-                                cap.release()
-                                try: os.remove(tmp_path)
-                                except Exception: pass
-                                return True, frame
+            cap = cv2.VideoCapture(u, cv2.CAP_FFMPEG)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(u)
+            if cap.isOpened():
+                for _ in range(4):
+                    ret, frame = cap.read()
+                    if ret and frame is not None and frame.size > 0:
                         cap.release()
-                    try: os.remove(tmp_path)
-                    except Exception: pass
+                        return True, frame
+                cap.release()
         except Exception:
             pass
 
-    # Direct OpenCV RTSP/HTTP Fallback
-    try:
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1500"
-        cap = cv2.VideoCapture(f"http://live.corp8.cloud/stream/{clean_id}", cv2.CAP_FFMPEG)
-        if not cap.isOpened():
-            cap = cv2.VideoCapture(f"http://live.corp8.cloud/stream/{clean_id}")
-        if cap.isOpened():
-            ret, frame = cap.read()
-            cap.release()
-            if ret and frame is not None and frame.size > 0:
-                return True, frame
-    except Exception:
-        pass
+    # 2. Byte-Bounded urllib Chunk Ingestion
+    for u in target_urls:
+        if "http" in u:
+            try:
+                req = urllib.request.Request(
+                    u, 
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Range": "bytes=0-1500000"}
+                )
+                with urllib.request.urlopen(req, timeout=2.0) as response:
+                    chunk = response.read(1500000)
+                    if len(chunk) > 10000:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+                            tmp.write(chunk)
+                            tmp_path = tmp.name
+                        
+                        cap = cv2.VideoCapture(tmp_path)
+                        if cap.isOpened():
+                            for _ in range(4):
+                                ret, frame = cap.read()
+                                if ret and frame is not None and frame.size > 0:
+                                    cap.release()
+                                    try: os.remove(tmp_path)
+                                    except Exception: pass
+                                    return True, frame
+                            cap.release()
+                        try: os.remove(tmp_path)
+                        except Exception: pass
+            except Exception:
+                pass
 
     return False, None
 
@@ -2623,8 +2640,7 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
             get_active_stream_url(cam_obj),
             f"http://live.corp8.cloud/stream/{clean_id}",
             f"https://live.corp8.cloud/stream/{clean_id}",
-            f"rtsp://live.corp8.cloud:8554/stream/{clean_id}",
-            "http://live.corp8.cloud/stream/14"
+            f"rtsp://live.corp8.cloud:8554/stream/{clean_id}"
         ]
         stream_urls_to_try = [u for u in stream_urls_to_try if u]
         
@@ -3651,8 +3667,6 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 
                 # 1. Robust Live Stream Frame Capture via urllib Buffer Ingest
                 ret, frame = capture_live_frame_from_stream(selected_cam)
-                if not ret or frame is None:
-                    ret, frame = capture_live_frame_from_stream({"stream_id": "14"})
                 if not ret or frame is None:
                     st.error("Live stream endpoint is currently offline or unreachable.")
                     st.stop()
