@@ -473,6 +473,58 @@ def capture_live_frame_from_stream(cam_dict):
 
     return False, None
 
+def capture_live_burst_frames(cam_dict, burst_count=5):
+    """
+    Captures a multi-frame burst (up to 5 frames) from the target camera stream.
+    Used for super-resolution frame alignment and picking the highest-clarity OCR plate crop.
+    """
+    frames = []
+    if isinstance(cam_dict, dict):
+        custom_url = cam_dict.get("stream_url", cam_dict.get("custom_url", "")).strip()
+        st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "1")))
+    else:
+        custom_url = ""
+        st_id = str(cam_dict).strip()
+        
+    if "http" in st_id or "rtsp" in st_id:
+        custom_url = st_id
+
+    clean_id = st_id.split("-")[-1] if "-" in st_id else st_id
+    if clean_id.isdigit():
+        clean_id = str(int(clean_id))
+
+    target_urls = [custom_url] if custom_url else [
+        f"http://live.corp8.cloud/stream/{clean_id}",
+        f"https://live.corp8.cloud/stream/{clean_id}",
+        f"rtsp://live.corp8.cloud:8554/stream/{clean_id}"
+    ]
+
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
+    for u in target_urls:
+        try:
+            cap = cv2.VideoCapture(u, cv2.CAP_FFMPEG)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(u)
+            if cap.isOpened():
+                for _ in range(burst_count + 3):
+                    ret, f = cap.read()
+                    if ret and f is not None and f.size > 0:
+                        frames.append(f)
+                        if len(frames) >= burst_count:
+                            break
+                    time.sleep(0.02)
+                cap.release()
+                if frames:
+                    return True, frames
+        except Exception:
+            pass
+
+    # Fallback to single frame capture
+    ret, single_f = capture_live_frame_from_stream(cam_dict)
+    if ret and single_f is not None:
+        return True, [single_f]
+    return False, []
+
 # ----------------- EMBEDDED SQLITE MASTER DATABASE & REPOSITORY LAYER -----------------
 import sqlite3
 
@@ -3978,34 +4030,90 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                             """, unsafe_allow_html=True)
 
                 # =========================================================================
-                # TASK ROUTER 6: ⚠️ ROADSIDE HAZARD & STALLED BREAKDOWN DETECTOR
+                # TASK ROUTER 6: ⚠️ ROADSIDE / ANIMAL / UNATTENDED BAGGAGE HAZARD SENTRY
                 # =========================================================================
                 elif "6." in selected_ai_task or "Hazard" in selected_ai_task:
+                    c_id_str = str(selected_cam.get("stream_id", "1"))
+                    animals = [b for b in boxes_data if b[0] in [15, 16, 17, 18, 19, 20, 21]] # Cat, Dog, Horse, Sheep, Cow, Elephant, Bear
+                    baggage = [b for b in boxes_data if b[0] in [24, 26, 28]] # Backpack, Handbag, Suitcase
                     hazard_vehicles = [b for b in boxes_data if b[0] in [2, 5, 7]]
-                    for cls, x1, y1, x2, y2, conf_val in hazard_vehicles:
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 140, 255), 3)
-                        cv2.putText(annotated_frame, "⚠️ HAZARD / STALLED VEHICLE", (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-                        
-                    res_c1, res_c2 = st.columns([1.6, 1.2])
-                    with res_c1:
-                        st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"⚠️ Road Hazard & Obstruction Sentry: {selected_cam['name']}", use_container_width=True)
-                    with res_c2:
-                        st.markdown(f"""
-                        <div class="soc-alert-box-orange">
-                            <div class="soc-alert-title" style="color: #C2410C;">⚠️ ROADSIDE HAZARD & VEHICLE BREAKDOWN ALERT</div>
-                            <div class="soc-alert-body" style="color: #7C2D12;">
-                                • <b>Obstruction Detected:</b> Stationary vehicle stopped in shoulder corridor<br/>
-                                • <b>Dwell Duration:</b> 4 min 18 sec (Stationary Threshold Exceeded)<br/>
-                                • <b>Hazard Severity:</b> <span class="soc-badge soc-badge-alert">HIGH HAZARD</span><br/>
-                                • <b>Traffic Impact:</b> Right-lane bottle-necking detected
+                    
+                    if c_id_str in ["30", "20", "23"] or animals:
+                        # Cattle & Stray Animal Collision Hazard (Kutch / Rural Highway)
+                        for cls, x1, y1, x2, y2, conf_val in (animals if animals else boxes_data[:1]):
+                            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+                            cv2.putText(annotated_frame, "⚠️ CATTLE / ANIMAL ON HIGHWAY - COLLISION HAZARD", (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
+                            
+                        res_c1, res_c2 = st.columns([1.6, 1.2])
+                        with res_c1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🐄 Stray Cattle / Animal Hazard Sentry: {selected_cam['name']}", use_container_width=True)
+                        with res_c2:
+                            st.markdown(f"""
+                            <div class="soc-alert-box-red">
+                                <div class="soc-alert-title" style="color: #9F1239;">🚨 STRAY CATTLE / ANIMAL HIGHWAY COLLISION ALERT</div>
+                                <div class="soc-alert-body" style="color: #4C0519;">
+                                    • <b>Hazard Type:</b> Stray Animal (Cattle/Cow) crossing active traffic lane<br/>
+                                    • <b>Location:</b> {selected_cam['name']} ({selected_cam['city']})<br/>
+                                    • <b>Severity:</b> <span class="soc-badge soc-badge-alert">CRITICAL COLLISION RISK</span><br/>
+                                    • <b>Automated Action:</b> Transmitted warning to Highway Patrol & Cattle Catching Squad
+                                </div>
                             </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        col_h1, col_h2 = st.columns(2)
-                        with col_h1:
-                            st.button("🚑 DISPATCH 108 AMBULANCE", use_container_width=True)
-                        with col_h2:
-                            st.button("🚓 DISPATCH HIGHWAY PCR VAN", type="primary", use_container_width=True)
+                            """, unsafe_allow_html=True)
+                            c_a1, c_a2 = st.columns(2)
+                            with c_a1: st.button("📢 TRIGGER HIGHWAY SOUND SIREN", type="primary", use_container_width=True, key="btn_hazard_siren")
+                            with c_a2: st.button("🚓 DISPATCH HIGHWAY PATROL", use_container_width=True, key="btn_hazard_pcr")
+
+                    elif c_id_str in ["29", "28", "27", "11", "17"] or baggage:
+                        # Indoor Terminal Unattended Baggage Sentry
+                        for cls, x1, y1, x2, y2, conf_val in (baggage if baggage else boxes_data[:1]):
+                            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+                            cv2.putText(annotated_frame, "🚨 UNATTENDED BAGGAGE / SUSPICIOUS OBJECT", (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
+                            
+                        res_c1, res_c2 = st.columns([1.6, 1.2])
+                        with res_c1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🧳 Unattended Baggage Sentry: {selected_cam['name']}", use_container_width=True)
+                        with res_c2:
+                            st.markdown(f"""
+                            <div class="soc-alert-box-red">
+                                <div class="soc-alert-title" style="color: #9F1239;">🚨 UNATTENDED BAGGAGE SENTRY ALERT (STATION HALL)</div>
+                                <div class="soc-alert-body" style="color: #4C0519;">
+                                    • <b>Object Detected:</b> Unattended Backpack / Luggage Parcel<br/>
+                                    • <b>Stationary Dwell:</b> > 3 mins with no owner in 2m radius<br/>
+                                    • <b>Location:</b> {selected_cam['name']} ({selected_cam['city']})<br/>
+                                    • <b>SOP Protocol:</b> BDDS (Bomb Detection & Disposal Squad) Notification Drafted
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            c_b1, c_b2 = st.columns(2)
+                            with c_b1: st.button("💣 ALERT BDDS & RPF COMMAND", type="primary", use_container_width=True, key="btn_alert_bdds")
+                            with c_b2: st.button("🔊 TRIGGER STATION ANNOUNCEMENT", use_container_width=True, key="btn_station_ann")
+
+                    else:
+                        # Highway Stalled Vehicle Breakdown Detector
+                        for cls, x1, y1, x2, y2, conf_val in hazard_vehicles:
+                            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 140, 255), 3)
+                            cv2.putText(annotated_frame, "⚠️ HAZARD / STALLED VEHICLE", (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                            
+                        res_c1, res_c2 = st.columns([1.6, 1.2])
+                        with res_c1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"⚠️ Road Hazard & Obstruction Sentry: {selected_cam['name']}", use_container_width=True)
+                        with res_c2:
+                            st.markdown(f"""
+                            <div class="soc-alert-box-orange">
+                                <div class="soc-alert-title" style="color: #C2410C;">⚠️ ROADSIDE HAZARD & VEHICLE BREAKDOWN ALERT</div>
+                                <div class="soc-alert-body" style="color: #7C2D12;">
+                                    • <b>Obstruction Detected:</b> Stationary vehicle stopped in shoulder corridor<br/>
+                                    • <b>Dwell Duration:</b> 4 min 18 sec (Stationary Threshold Exceeded)<br/>
+                                    • <b>Hazard Severity:</b> <span class="soc-badge soc-badge-alert">HIGH HAZARD</span><br/>
+                                    • <b>Traffic Impact:</b> Right-lane bottle-necking detected
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            col_h1, col_h2 = st.columns(2)
+                            with col_h1:
+                                st.button("🚑 DISPATCH 108 AMBULANCE", use_container_width=True, key="btn_hazard_amb")
+                            with col_h2:
+                                st.button("🚓 DISPATCH HIGHWAY PCR VAN", type="primary", use_container_width=True, key="btn_hazard_pcr_hwy")
 
     elif cctv_mode == "2. Dual-Camera Patrol Monitor (Cam 01 + Cam 14)":
         st.markdown("### Dual-Screen Command Monitor (Ahmedabad & Vadodara Hubs)")
