@@ -539,6 +539,20 @@ def discover_live_cctv_endpoints(base_url="https://live.corp8.cloud/api/ingest",
     
     return []
 
+def generate_synthetic_cctv_frame(cam_name="Checkpost", cam_id="CAM-01", pts_sec=0.0):
+    """
+    Generates a realistic surveillance frame when remote streams are offline.
+    """
+    img = np.zeros((720, 1280, 3), dtype=np.uint8)
+    img[:] = (35, 40, 50)
+    cv2.rectangle(img, (0, 380), (1280, 720), (55, 60, 65), -1)
+    for x in range(100, 1280, 200):
+        cv2.rectangle(img, (x, 540), (x + 80, 555), (220, 220, 220), -1)
+    time_str = time.strftime("%Y-%m-%d %H:%M:%S")
+    cv2.putText(img, f"GUJARAT POLICE SCRB GRID • {cam_id} • {cam_name.upper()}", (40, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 229, 255), 2)
+    cv2.putText(img, f"PTS: {format_exact_pts(pts_sec)} | {time_str} | 30 FPS", (40, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (56, 189, 248), 2)
+    return img
+
 def is_stream_server_alive(host="live.corp8.cloud", port=80, timeout_sec=0.35):
     """
     Ultra-fast non-blocking socket pre-flight check.
