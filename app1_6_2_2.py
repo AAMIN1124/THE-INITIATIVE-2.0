@@ -4546,7 +4546,7 @@ elif nav_section == "Cross-Camera Suspect Re-ID Tracker":
                 """, unsafe_allow_html=True)
 
                 st.markdown("#### 🗺️ Statewide Intercept Route & Checkpoint Trajectory")
-                m_reid = folium.Map(location=[22.8, 71.8], zoom_start=8, tiles="cartodbpositron")
+                m_reid = folium.Map(location=[22.8, 71.8], zoom_start=8, tiles="OpenStreetMap")
                 for s in matched_sightings:
                     loc_name = s.get("Checkpost Location", "")
                     cam_meta = next((c for c in ACTIVE_CCTV_CATALOGUE if c["name"] in loc_name or loc_name in c["name"]), None)
@@ -4611,7 +4611,7 @@ elif nav_section == "Cross-Camera Suspect Re-ID Tracker":
                     render_metric_card(f"Waypoint {i+1}: {cam['name']}", f"{sc}% Match", f"Re-ID Appearance: {q_color}", "green")
 
             st.markdown("#### 🗺️ Multi-Camera Visual Re-ID Trajectory Map")
-            m_va = folium.Map(location=[22.8, 71.8], zoom_start=8, tiles="cartodbpositron")
+            m_va = folium.Map(location=[22.8, 71.8], zoom_start=8, tiles="OpenStreetMap")
             for cam, sc in cand_sightings:
                 folium.Marker(
                     location=[cam["lat"], cam["lon"]],
@@ -4633,7 +4633,7 @@ elif nav_section == "Predictive Crime Hotspot AI Map":
     with m_h3: render_metric_card("Night Risk Index", "High (11 PM - 4 AM)", "Interstate Truck Corridors", color="red")
     with m_h4: render_metric_card("Predictive Accuracy", "91.4%", "Spatial Machine Learning", color="green")
 
-    map_hotspot = folium.Map(location=[22.8, 71.8], zoom_start=8, tiles="cartodbpositron")
+    map_hotspot = folium.Map(location=[22.8, 71.8], zoom_start=8, tiles="OpenStreetMap")
     folium.Circle(location=[22.3000, 73.1800], radius=15000, color="#E11D48", fill=True, fill_color="#E11D48", fill_opacity=0.35, popup="<b>HOTSPOT 1: Vadodara Junction</b><br/>High RLVD & Intersection Breaches").add_to(map_hotspot)
     folium.Circle(location=[24.1700, 72.4300], radius=22000, color="#EA580C", fill=True, fill_color="#EA580C", fill_opacity=0.35, popup="<b>HOTSPOT 2: Banaskantha Border</b><br/>Night Contraband & Smuggling Corridor").add_to(map_hotspot)
     folium.Circle(location=[23.0450, 72.5710], radius=12000, color="#E11D48", fill=True, fill_color="#E11D48", fill_opacity=0.35, popup="<b>HOTSPOT 3: Ahmedabad Overbridge</b><br/>Overspeeding & Heavy AMTS Density").add_to(map_hotspot)
@@ -5245,7 +5245,7 @@ elif nav_section == "Gujarat GIS Suspect Route Tracker":
     with c2: render_metric_card("Detection Waypoints", str(len(active_logs)), "Waypoints from Forensic Buffer", color="red")
     with c3: render_metric_card("Map Intelligence Grid", "ONLINE", "Leaflet Spatial GIS Layer", color="blue")
 
-    m = folium.Map(location=[22.5, 71.8], zoom_start=8, tiles="cartodbpositron")
+    m = folium.Map(location=[22.8, 71.8], zoom_start=8, tiles="OpenStreetMap")
     for cp in ACTIVE_CCTV_CATALOGUE:
         folium.CircleMarker(
             location=[cp["lat"], cp["lon"]],
@@ -5376,7 +5376,7 @@ Smart City,CAM-GJ-0105,Race Course Circle,Rajkot,22.3000,70.7900,Fixed Dual ANPR
         </div>
         """, unsafe_allow_html=True)
 
-        map_reg = folium.Map(location=[22.8, 71.8], zoom_start=7, tiles="cartodbpositron")
+        map_reg = folium.Map(location=[22.8, 71.8], zoom_start=8, tiles="OpenStreetMap")
         
         # Color markers by SLA status
         for cp in cctv_registry_records:
