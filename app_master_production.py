@@ -97,9 +97,20 @@ def init_officer_profile_store():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        
+        # Check if legacy table structure exists and upgrade if needed
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='officer_profile_store'")
+        if cur.fetchone():
+            cur.execute("PRAGMA table_info(officer_profile_store)")
+            columns = [row["name"] for row in cur.fetchall()]
+            if "username" not in columns:
+                cur.execute("DROP TABLE officer_profile_store")
+
         cur.execute("""
         CREATE TABLE IF NOT EXISTS officer_profile_store (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
             name TEXT NOT NULL,
             post TEXT NOT NULL,
             badge_id TEXT NOT NULL,
@@ -112,34 +123,65 @@ def init_officer_profile_store():
             avatar_base64 TEXT
         )
         """)
-        cur.execute("SELECT COUNT(*) FROM officer_profile_store")
-        if cur.fetchone()[0] == 0:
+        
+        default_officers = [
+            ("AAMIN", "1124", "Officer Aamin", "Senior Cyber Forensic Examiner & ANPR Grid Lead", "GP-SCRB-8842", "State Crime Record Bureau (SCRB)", "SCRB Cyber Command Grid, Gandhinagar", "+91 94280 11240", "aamin.scrb@gujarat.gov.in", "Level 4 (State Forensics Clearance)", "14-Feb-2021", None),
+            ("PRATHAM", "1111", "Officer Pratham", "Deputy Superintendent of Police (Cyber & ANPR Ops)", "GP-SCRB-9102", "Crime Branch Intelligence", "Crime Branch HQ, Ahmedabad", "+91 98250 11110", "pratham.police@gujarat.gov.in", "Level 4 (State Intelligence Clearance)", "10-Jan-2020", None),
+            ("PIYUSH", "2222", "Officer Piyush", "Inspector of Police (Highway Intercept Command)", "GP-SCRB-7341", "Highway Safety & Traffic Branch", "Vadodara Highway Command Center", "+91 98790 22220", "piyush.traffic@gujarat.gov.in", "Level 3 (Highway Intercept Clearance)", "15-Aug-2021", None),
+            ("HARSIL", "3333", "Officer Harsil", "Sub-Inspector & Video Forensics Specialist", "GP-SCRB-6250", "Forensic Science & Surveillance Wing", "Rajkot Zone Surveillance Hub", "+91 99090 33330", "harsil.forensics@gujarat.gov.in", "Level 3 (Video Forensics Clearance)", "01-Dec-2022", None),
+            ("ADMIN", "scrb2026", "Commanding Officer (Admin)", "Chief of Police SCRB & Systems Administrator", "GP-HQ-0001", "State Police Headquarters", "DGP Command Control Enclave, Gandhinagar", "+91 79 23250000", "admin.scrb@gujarat.gov.in", "Level 5 (Supreme State Command Clearance)", "01-Jan-2018", None)
+        ]
+        
+        for u in default_officers:
             cur.execute("""
-            INSERT INTO officer_profile_store 
-            (name, post, badge_id, dept, station, phone, email, clearance, joining_date, avatar_base64)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                "Officer Aamin",
-                "Senior Cyber Forensic Examiner & ANPR Grid Lead",
-                "GP-SCRB-8842",
-                "State Crime Record Bureau (SCRB)",
-                "SCRB Cyber Command & Control Grid, Gandhinagar",
-                "+91 94280 11240",
-                "aamin.scrb@gujarat.gov.in",
-                "Level 4 (State Forensics & Intercept Clearance)",
-                "14-Feb-2021",
-                None
-            ))
-            conn.commit()
+            INSERT OR IGNORE INTO officer_profile_store 
+            (username, password, name, post, badge_id, dept, station, phone, email, clearance, joining_date, avatar_base64)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, u)
+            
+        conn.commit()
         conn.close()
     except Exception:
         pass
 
-def load_saved_officer_profile():
+def authenticate_officer(username_input, password_input):
+    u_clean = str(username_input).strip().upper()
+    p_clean = str(password_input).strip()
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT * FROM officer_profile_store ORDER BY id DESC LIMIT 1")
+        cur.execute("SELECT * FROM officer_profile_store WHERE UPPER(username) = ? AND password = ?", (u_clean, p_clean))
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+    except Exception:
+        pass
+    return None
+
+def load_user_profile_by_username(username):
+    u_clean = str(username).strip().upper()
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM officer_profile_store WHERE UPPER(username) = ?", (u_clean,))
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+    except Exception:
+        pass
+    return None
+
+def load_saved_officer_profile():
+    if "authenticated_username" in st.session_state and st.session_state.authenticated_username:
+        user_prof = load_user_profile_by_username(st.session_state.authenticated_username)
+        if user_prof:
+            return user_prof
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM officer_profile_store ORDER BY id ASC LIMIT 1")
         row = cur.fetchone()
         conn.close()
         if row:
@@ -147,38 +189,41 @@ def load_saved_officer_profile():
     except Exception:
         pass
     return {
+        "username": "AAMIN",
         "name": "Officer Aamin",
         "post": "Senior Cyber Forensic Examiner & ANPR Grid Lead",
         "badge_id": "GP-SCRB-8842",
         "dept": "State Crime Record Bureau (SCRB)",
-        "station": "SCRB Cyber Command & Control Grid, Gandhinagar",
+        "station": "SCRB Cyber Command Grid, Gandhinagar",
         "phone": "+91 94280 11240",
         "email": "aamin.scrb@gujarat.gov.in",
-        "clearance": "Level 4 (State Forensics & Intercept Clearance)",
+        "clearance": "Level 4 (State Forensics Clearance)",
         "joining_date": "14-Feb-2021",
         "avatar_base64": None
     }
 
 def save_officer_profile_to_db(prof_dict):
+    username = prof_dict.get("username", "AAMIN").upper()
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("DELETE FROM officer_profile_store")
         cur.execute("""
-        INSERT INTO officer_profile_store 
-        (name, post, badge_id, dept, station, phone, email, clearance, joining_date, avatar_base64)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        UPDATE officer_profile_store SET
+            name = ?, post = ?, badge_id = ?, dept = ?, station = ?,
+            phone = ?, email = ?, clearance = ?, joining_date = ?, avatar_base64 = ?
+        WHERE UPPER(username) = ?
         """, (
-            prof_dict.get("name", "Officer Aamin"),
-            prof_dict.get("post", "Senior Cyber Forensic Examiner & ANPR Grid Lead"),
-            prof_dict.get("badge_id", "GP-SCRB-8842"),
-            prof_dict.get("dept", "State Crime Record Bureau (SCRB)"),
-            prof_dict.get("station", "SCRB Cyber Command & Control Grid, Gandhinagar"),
-            prof_dict.get("phone", "+91 94280 11240"),
-            prof_dict.get("email", "aamin.scrb@gujarat.gov.in"),
-            prof_dict.get("clearance", "Level 4 (State Forensics & Intercept Clearance)"),
-            prof_dict.get("joining_date", "14-Feb-2021"),
-            prof_dict.get("avatar_base64", None)
+            prof_dict.get("name", "Officer"),
+            prof_dict.get("post", "Police Officer"),
+            prof_dict.get("badge_id", "GP-SCRB-0000"),
+            prof_dict.get("dept", "Gujarat Police"),
+            prof_dict.get("station", "Gujarat"),
+            prof_dict.get("phone", ""),
+            prof_dict.get("email", ""),
+            prof_dict.get("clearance", "Level 3"),
+            prof_dict.get("joining_date", "2021-01-01"),
+            prof_dict.get("avatar_base64", None),
+            username
         ))
         conn.commit()
         conn.close()
@@ -1679,30 +1724,70 @@ if not st.session_state.authenticated:
     </div>
     """, unsafe_allow_html=True)
 
-    c_left, c_form, c_right = st.columns([1, 1.4, 1])
+    c_left, c_form, c_right = st.columns([1, 1.6, 1])
     with c_form:
-        login_user = st.text_input("Officer Badge ID / Username", value="", placeholder="e.g. AAMIN", key="auth_badge_id")
+        login_user = st.text_input("Officer Badge ID / Username", value="", placeholder="e.g. AAMIN, PRATHAM, PIYUSH, HARSIL, ADMIN", key="auth_badge_id")
         login_pass = st.text_input("Security PIN / Password", type="password", placeholder="Enter Security Password", key="auth_pin")
 
         if st.button("AUTHENTICATE & ENTER TERMINAL", type="primary", use_container_width=True):
-            if login_user.strip().upper() == "AAMIN" and login_pass.strip() == "1124":
+            officer_record = authenticate_officer(login_user, login_pass)
+            if officer_record:
                 st.session_state.authenticated = True
-                st.session_state.officer_profile["name"] = "Officer Aamin"
-                st.session_state.officer_profile["post"] = "Senior Cyber Forensic Examiner & ANPR Division Lead"
-                st.session_state.current_user = "Officer Aamin (SCRB Senior Investigator)"
-                st.success("Authentication confirmed. Access granted.")
-                time.sleep(0.3)
-                st.rerun()
-            elif login_user.strip().upper() == "ADMIN" and login_pass.strip() == "scrb2026":
-                st.session_state.authenticated = True
-                st.session_state.officer_profile["name"] = "Commanding Officer (Admin)"
-                st.session_state.officer_profile["post"] = "Chief of Police SCRB & Systems Administrator"
-                st.session_state.current_user = "Commanding Officer (Admin)"
-                st.success("Authentication confirmed. Admin grid active.")
+                st.session_state.authenticated_username = officer_record["username"]
+                st.session_state.officer_profile = officer_record
+                st.session_state.current_user = f"{officer_record['name']} ({officer_record['badge_id']})"
+                st.success(f"Authentication confirmed. Welcome, {officer_record['name']}!")
                 time.sleep(0.3)
                 st.rerun()
             else:
                 st.error("Invalid credentials. Unauthorized access attempt recorded.")
+
+        st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
+        st.markdown("**⚡ Quick-Fill Registered Officer Test Profiles:**")
+        q_c1, q_c2, q_c3 = st.columns(3)
+        with q_c1:
+            if st.button("👤 Aamin (1124)", use_container_width=True):
+                rec = authenticate_officer("AAMIN", "1124")
+                if rec:
+                    st.session_state.authenticated = True
+                    st.session_state.authenticated_username = "AAMIN"
+                    st.session_state.officer_profile = rec
+                    st.session_state.current_user = f"{rec['name']} ({rec['badge_id']})"
+                    st.rerun()
+            if st.button("👤 Pratham (1111)", use_container_width=True):
+                rec = authenticate_officer("PRATHAM", "1111")
+                if rec:
+                    st.session_state.authenticated = True
+                    st.session_state.authenticated_username = "PRATHAM"
+                    st.session_state.officer_profile = rec
+                    st.session_state.current_user = f"{rec['name']} ({rec['badge_id']})"
+                    st.rerun()
+        with q_c2:
+            if st.button("👤 Piyush (2222)", use_container_width=True):
+                rec = authenticate_officer("PIYUSH", "2222")
+                if rec:
+                    st.session_state.authenticated = True
+                    st.session_state.authenticated_username = "PIYUSH"
+                    st.session_state.officer_profile = rec
+                    st.session_state.current_user = f"{rec['name']} ({rec['badge_id']})"
+                    st.rerun()
+            if st.button("👤 Harsil (3333)", use_container_width=True):
+                rec = authenticate_officer("HARSIL", "3333")
+                if rec:
+                    st.session_state.authenticated = True
+                    st.session_state.authenticated_username = "HARSIL"
+                    st.session_state.officer_profile = rec
+                    st.session_state.current_user = f"{rec['name']} ({rec['badge_id']})"
+                    st.rerun()
+        with q_c3:
+            if st.button("👑 Admin (scrb2026)", use_container_width=True):
+                rec = authenticate_officer("ADMIN", "scrb2026")
+                if rec:
+                    st.session_state.authenticated = True
+                    st.session_state.authenticated_username = "ADMIN"
+                    st.session_state.officer_profile = rec
+                    st.session_state.current_user = f"{rec['name']} ({rec['badge_id']})"
+                    st.rerun()
     st.stop()
 
 # ----------------- DATASETS & MODEL MANAGEMENT (CACHED SINGLETON) -----------------
@@ -3494,6 +3579,7 @@ if nav_section == "Officer Profile & Credentials":
             </div>
             <div style="font-size: 1.25rem; font-weight: 900; color: #0F172A;">{prof['name']}</div>
             <div style="font-size: 0.82rem; font-weight: 700; color: #0369A1; margin-top: 2px;">{prof['post']}</div>
+            <div style="font-size: 0.76rem; font-weight: 700; color: #0284C7; margin-top: 2px;">Username: <code>{prof.get('username', 'OFFICER')}</code></div>
             <div style="margin-top: 12px;">
                 <span class="soc-badge soc-badge-online">ACTIVE IN SERVICE</span>
             </div>
@@ -3510,7 +3596,7 @@ if nav_section == "Officer Profile & Credentials":
             st.rerun()
 
     with p_col2:
-        st.markdown("#### Official Police Identity Details")
+        st.markdown(f"#### Official Police Identity Details • [{prof.get('username', 'OFFICER')}]")
         with st.form("edit_officer_profile_form"):
             f_c1, f_c2 = st.columns(2)
             with f_c1:
@@ -3538,6 +3624,13 @@ if nav_section == "Officer Profile & Credentials":
                 st.success("Officer Identity Record successfully saved to permanent database.")
                 time.sleep(0.3)
                 st.rerun()
+
+    st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+    st.markdown("### 📋 Gujarat Police SCRB Authorized Officer Terminal Accounts Directory")
+    conn = get_db_connection()
+    df_all_officers = pd.read_sql("SELECT username as 'Username', name as 'Officer Name', post as 'Designation', badge_id as 'Badge Number', dept as 'Branch / Dept', clearance as 'Clearance Level', station as 'Station Unit' FROM officer_profile_store ORDER BY id ASC", conn)
+    conn.close()
+    st.dataframe(df_all_officers, use_container_width=True)
 
 # ----------------- MODULE: GUJARAT 25 CCTV LIVE NETWORK -----------------
 elif nav_section == "Gujarat 25 CCTV Live Network":
