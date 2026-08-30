@@ -3688,11 +3688,6 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         else:
             filtered_cams = ACTIVE_CCTV_CATALOGUE
 
-        vk1, vk2, vk3, vk4 = st.columns(4)
-        with vk1: render_metric_card("Active Channels", f"{len(filtered_cams)} Feeds", "Operational Grid", color="blue")
-        with vk2: render_metric_card("AI Feature Load", f"{len(filtered_cams)*3} Models", "Parallel Edge Inference", color="green")
-        with vk3: render_metric_card("Stream Codec", "H.264 / AVC", "1080p Ultra-Low Latency", color="orange")
-        with vk4: render_metric_card("Bandwidth Efficiency", "99.2% Edge Saved", "Zero-Buffer Range Stream", color="green")
 
         st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
         for i in range(0, len(filtered_cams), 2):
