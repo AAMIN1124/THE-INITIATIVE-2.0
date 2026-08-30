@@ -4673,34 +4673,62 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
     render_header("CCTV Video Forensic Engine (High-Speed Authentic CV & Real PTS)", prof["name"])
 
     st.markdown("""
-    <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-        <span class="step-badge-green">STEP 1: INPUT FOOTAGE</span>
+    <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+        <span class="step-badge-green">STEP 1: INPUT SOURCE</span>
         <span class="step-badge-orange">STEP 2: CHECKPOST NODE</span>
         <span class="step-badge-blue">STEP 3: TARGET FILTER</span>
-        <span class="step-badge-red">STEP 4: PRESENTATION SCAN (15X SPEED)</span>
-        <span class="step-badge-green">STEP 5: EVIDENCE TILES</span>
+        <span class="step-badge-red">STEP 4: AI FORENSIC SCAN</span>
+        <span class="step-badge-green">STEP 5: EVIDENCE CROPS</span>
         <span class="step-badge-orange">STEP 6: SEC-65B DOSSIER (2D QR)</span>
     </div>
     """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("**Step 1: Upload Genuine CCTV Video File**")
-        uploaded_video = st.file_uploader("Upload Footage (MP4, AVI, MOV, MKV)", type=["mp4", "avi", "mov", "mkv"])
-        
-        st.markdown("**Step 2: Camera / DVR Location Node**")
+        st.markdown("**Step 1: Select Forensic Ingest Source**")
+        forensic_source_mode = st.radio(
+            "Footage Ingest Source Mode:",
+            [
+                "📡 1. Live Checkpost DVR Stream Ingest (1-Click Instant Scan)",
+                "📁 2. Upload Forensic Video File (.mp4, .avi, .mov, .mkv)"
+            ],
+            key="for_src_mode"
+        )
+
+        st.markdown("**Step 2: Camera / Checkpost Node**")
         cam_choices = [f"{c['cam_id']}: {c['name']} ({c['city']})" for c in ACTIVE_CCTV_CATALOGUE]
-        selected_dvr_loc = st.selectbox("Select Checkpost / DVR Source Where Footage Was Captured", cam_choices, index=13)
+        selected_dvr_loc = st.selectbox("Select Checkpost / DVR Node Where Footage Originated", cam_choices, index=0, key="for_cam_choice")
         chosen_cam_obj = next(c for c in ACTIVE_CCTV_CATALOGUE if f"{c['cam_id']}: {c['name']} ({c['city']})" == selected_dvr_loc)
+
+        if "Upload" in forensic_source_mode:
+            uploaded_video = st.file_uploader("Upload Forensic Video File", type=["mp4", "avi", "mov", "mkv"], key="for_vid_file")
+        else:
+            uploaded_video = None
+            st.info(f"Targeting Checkpost Live Buffer: **{chosen_cam_obj['name']} ({chosen_cam_obj['city']})**")
 
     with col2:
         st.markdown("**Step 3: Target Watchlist (Optional Filter)**")
-        target_plate_input = st.text_input("Target License Plate (Leave blank for full vehicle scan)", value="", placeholder="e.g. AK64 DMV, GJ01 AB 1234, GJ06 CD 8842")
+        target_plate_input = st.text_input("Target License Plate (Leave blank for full vehicle scan)", value="", placeholder="e.g. AK64 DMV, GJ01 AB 1234, GJ06 CD 8842", key="for_tgt_pl")
         
-        frame_step_factor = st.slider("Presentation Frame Step Factor (Skip Interval)", min_value=5, max_value=30, value=15, step=5, help="Scans 1 frame every N frames (Default 15 = ~0.5s intervals) for ultra-fast presentation speed while capturing every passing vehicle.")
+        frame_step_factor = st.slider("Presentation Frame Step Factor (Skip Interval)", min_value=5, max_value=30, value=15, step=5, help="Scans 1 frame every N frames for ultra-fast presentation speed while capturing every passing vehicle.", key="for_step_factor")
 
-    if st.button("EXECUTE PRESENTATION-SPEED VIDEO FORENSIC SCAN", type="primary", use_container_width=True):
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    execute_forensic_scan = st.button("⚡ EXECUTE PRESENTATION-SPEED VIDEO FORENSIC SCAN (1-CLICK)", type="primary", use_container_width=True, key="btn_exec_forensic_scan")
+
+    if execute_forensic_scan:
+        start_t = time.time()
+        with st.spinner("Initializing Deep Learning Models (YOLOv8 + EasyOCR)..."):
+            yolo_model, ocr_reader = get_ai_models()
+
+        raw_detections = []
+        target_hits = []
+        target_confirmed = False
+        scanned_samples = 0
+        total_frames = 1
+        clean_target_plate = clean_str(target_plate_input)
+
         if uploaded_video is not None:
+            # File Upload Mode
             uploaded_video.seek(0)
             video_bytes = uploaded_video.read()
 
@@ -4709,30 +4737,13 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                 tmp.flush()
                 video_path = tmp.name
 
-            with st.spinner("Initializing Deep Learning Models (YOLOv8 + EasyOCR)..."):
-                yolo_model, ocr_reader = get_ai_models()
-
             cap = cv2.VideoCapture(video_path)
-            # Hardware PTS extraction complying strictly with ISO/IEC 13818-1 (No CAP_PROP_FPS dependency)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
-            step_msec = 1000.0 # 1 sample every 1000ms hardware presentation timestamp
-            clean_target_plate = clean_str(target_plate_input)
-
-            start_t = time.time()
-            current_frame = 0
-            scanned_samples = 0
-            
-            raw_detections = []
-            target_hits = []
-            target_confirmed = False
-            
-            scan_progress = st.progress(0.0)
-            scan_status = st.empty()
-
-            # ----------------- SUB-3-SECOND VIDEO FORENSIC ENGINE (HARDWARE PTS) -----------------
-            step_msec = 1000.0
             current_frame = 0
             last_known_pts_ms = 0.0
+
+            scan_progress = st.progress(0.0)
+            scan_status = st.empty()
 
             while current_frame < total_frames:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
@@ -4743,32 +4754,29 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                 scanned_samples += 1
                 prog_val = min(1.0, (current_frame + 1) / max(1, total_frames))
                 scan_progress.progress(prog_val)
-                scan_status.caption(f"⚡ High-Speed Hardware Seek: Frame {current_frame+1}/{total_frames} ({int(prog_val * 100)}%) | 1 Frame/Sec...")
+                scan_status.caption(f"⚡ High-Speed Hardware Seek: Frame {current_frame+1}/{total_frames} ({int(prog_val * 100)}%)...")
 
-                # Strict Hardware Presentation Timestamp extraction
                 real_sec, last_known_pts_ms = extract_hardware_pts(cap, last_known_pts_ms)
                 real_time_str = format_exact_pts(real_sec)
                 fh, fw = frame.shape[:2]
 
-                # Run YOLOv8 on full frame restricted to vehicle classes [2, 3, 5, 7] at imgsz=480, conf=0.5
                 with YOLO_INFERENCE_LOCK:
-                    res = yolo_model(frame, verbose=False, imgsz=480, conf=0.50)
+                    res = yolo_model(frame, verbose=False, imgsz=480, conf=0.35)
 
                 frame_vehicles = []
                 for r in res:
                     for box in r.boxes:
                         cls = int(box.cls[0])
-                        if cls in [2, 3, 5, 7]: # Car, Motorcycle, Bus, Truck
+                        if cls in [2, 3, 5, 7]:
                             x1, y1, x2, y2 = map(int, box.xyxy[0])
                             v_conf = float(box.conf[0])
                             vh, vw = y2 - y1, x2 - x1
-                            if vh > 35 and vw > 35:
+                            if vh > 30 and vw > 30:
                                 x1_c, y1_c = max(0, x1), max(0, y1)
                                 x2_c, y2_c = min(fw, x2), min(fh, y2)
                                 v_crop = frame[y1_c:y2_c, x1_c:x2_c]
                                 frame_vehicles.append((v_crop, cls, v_conf))
 
-                # Extract plate, resize to height=64, run fast OCR
                 for v_crop, cls, v_conf in frame_vehicles:
                     ocr_hits = run_strict_ocr_on_crop(ocr_reader, v_crop)
                     v_class_name = CLASS_NAMES.get(cls, "Vehicle")
@@ -4806,15 +4814,12 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                                 "Lat": chosen_cam_obj["lat"],
                                 "Lon": chosen_cam_obj["lon"]
                             }
-                            
                             raw_detections.append(detection_record)
-                            if is_match or (clean_target_plate and is_match):
+                            if is_match:
                                 target_hits.append(detection_record)
                                 target_confirmed = True
-                                # Instant short-circuit after confirmed match
-                                if clean_target_plate:
-                                    break
-                    
+                                break
+
                     if target_confirmed and clean_target_plate:
                         break
 
@@ -4824,117 +4829,197 @@ elif nav_section == "CCTV Video Forensic Engine (PTS & ANPR)":
                 current_frame += frame_step_factor
 
             cap.release()
+            try: os.remove(video_path)
+            except Exception: pass
             scan_progress.progress(1.0)
             scan_status.empty()
-            elapsed = round(time.time() - start_t, 2)
 
-            # ----------------- DISPLAY RESULTS -----------------
-            st.markdown(f"### Presentation Forensic Scan Summary ({elapsed}s execution time)")
-            
-            k_s1, k_s2, k_s3, k_s4 = st.columns(4)
-            with k_s1: render_metric_card("Frames Scanned", f"{scanned_samples} / {total_frames}", f"Skip Step: {frame_step_factor} Frames", color="blue")
-            with k_s2: render_metric_card("Plates Extracted", f"{len(raw_detections)} Readings", "Conf >= 0.40 & Len 5-10", color="green")
-            with k_s3: render_metric_card("Target Hits", f"{len(target_hits)} Matches" if clean_target_plate else "N/A (Full Scan)", "Authentic Watchlist Hits", color="red" if target_hits else "orange")
-            with k_s4: render_metric_card("Camera Node", chosen_cam_obj["cam_id"], f"{chosen_cam_obj['city']}", color="green")
-
-            if clean_target_plate:
-                if target_hits:
-                    trigger_audio_sos()
-                    top_match = target_hits[0]
-                    trigger_voice_dispatch(f"Target Hit: Vehicle {top_match['Detected Plate']} intercepted at frame {top_match['Frame Number']}.")
-                    wa_link = generate_whatsapp_dispatch_link(top_match['Detected Plate'], chosen_cam_obj['name'], chosen_cam_obj['lat'], chosen_cam_obj['lon'])
-
-                    st.markdown(f"""
-                    <div class="soc-alert-box-red">
-                        <div class="soc-alert-title" style="color: #9F1239;">🎯 TARGET POSITIVE INTERCEPT • [{top_match['Detected Plate']}]</div>
-                        <div class="soc-alert-body" style="color: #4C0519;">
-                            • <b>First Detected:</b> Frame #{top_match['Frame Number']} @ <code>{top_match['PTS Timestamp']}</code> (Hardware PTS)<br/>
-                            • <b>Vehicle Type:</b> {top_match['Vehicle Class']} (YOLO: {top_match['YOLO Confidence']} | OCR: {top_match['OCR Confidence']})<br/>
-                            • <b>Location:</b> <b>{chosen_cam_obj['name']} ({chosen_cam_obj['city']})</b><br/>
-                            • <b>Total Confirmed Sightings in Video:</b> {len(target_hits)} frames
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    st.link_button("DISPATCH EMERGENCY WHATSAPP PATROL ALERT", wa_link, use_container_width=True)
-                else:
-                    st.markdown(f"""
-                    <div class="soc-alert-box-orange">
-                        <div class="soc-alert-title" style="color: #C2410C;">⚠️ TARGET NOT FOUND IN SUPPLIED FOOTAGE</div>
-                        <div class="soc-alert-body" style="color: #7C2D12;">
-                            Target license plate <b>[{target_plate_input}]</b> was NOT detected in this footage (Optimized presentation scan completed in {elapsed}s with dynamic frame skipping: {scanned_samples} frames processed with genuine bounding boxes).
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-            egujcop_hits_found = [d for d in raw_detections if d.get("eGujCop Rec")]
-            if egujcop_hits_found:
-                for eh in egujcop_hits_found[:2]:
-                    r_rec = eh["eGujCop Rec"]
-                    st.markdown(f"""
-                    <div class="soc-alert-box-red">
-                        <div class="soc-alert-title" style="color: #9F1239;">🚨 eGujCop / CCTNS STOLEN VEHICLE ALERT • [{eh['Detected Plate']}]</div>
-                        <div class="soc-alert-body" style="color: #4C0519;">
-                            • <b>FIR Number:</b> {r_rec['fir_no']} | <b>Police Station:</b> {r_rec['police_station']}<br/>
-                            • <b>Crime Category:</b> {r_rec['offence']} (<code>{r_rec['sections']}</code>)<br/>
-                            • <b>Status:</b> <span class="soc-badge soc-badge-alert">{r_rec['status']}</span>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-            if raw_detections:
-                st.markdown("### Step 5: Real Video Frame Crops & Isolated Plate Evidence")
-                display_items = target_hits if (clean_target_plate and target_hits) else raw_detections
-                
-                unique_crops = []
-                seen_plates = set()
-                for d in display_items:
-                    if d["Plate Clean"] not in seen_plates or len(unique_crops) < 4:
-                        seen_plates.add(d["Plate Clean"])
-                        unique_crops.append(d)
-                    if len(unique_crops) >= 6:
-                        break
-
-                crop_cols = st.columns(min(3, len(unique_crops)))
-                for idx, item in enumerate(unique_crops[:6]):
-                    with crop_cols[idx % 3]:
-                        st.image(item["Vehicle Crop RGB"], caption=f"Frame #{item['Frame Number']} @ {item['PTS Timestamp']} | {item['Vehicle Class']}", use_container_width=True)
-                        st.image(item["Plate Crop RGB"], caption=f"Isolated Plate: [{item['Detected Plate']}] (Conf: {item['OCR Confidence']})", use_container_width=True)
-
-                st.markdown("### Step 6: Millisecond-Accurate Forensic Detection Chronology")
-                
-                table_rows = []
-                for idx, item in enumerate(display_items):
-                    table_rows.append({
-                        "Event ID": f"EVT-{idx+1:03d}",
-                        "Frame No": item["Frame Number"],
-                        "Entry Time": item["PTS Timestamp"],
-                        "Exit Time": item["PTS Timestamp"],
-                        "Peak Clarity Time": item["PTS Timestamp"],
-                        "Duration": f"Frame #{item['Frame Number']}",
-                        "Vehicle Type": item["Vehicle Class"],
-                        "Event Type": "TARGET HIT" if item["Is Target Match"] else "VEHICLE IDENTIFIED",
-                        "Consensus Plate / Details": f"License Plate: [{item['Detected Plate']}]",
-                        "Match Confidence": item["OCR Confidence"],
-                        "Checkpost Location": item["Checkpost Location"],
-                        "City": item["City"],
-                        "Lat": item["Lat"],
-                        "Lon": item["Lon"],
-                        "Plate_Clean": item["Plate Clean"],
-                        "eGujCop Status": item["eGujCop Status"],
-                        "Source": f"Forensic Scan ({chosen_cam_obj['cam_id']})"
-                    })
-
-                df_forensic = pd.DataFrame(table_rows)
-                st.session_state["last_detection_logs"] = table_rows
-                st.session_state["all_cctv_sightings"].extend(table_rows)
-                st.dataframe(df_forensic[["Event ID", "Frame No", "Entry Time", "Vehicle Type", "Consensus Plate / Details", "Match Confidence", "eGujCop Status", "Checkpost Location"]], use_container_width=True)
-
-                pdf_dossier = generate_scrb_pdf_report(df_forensic, checkpost_source=chosen_cam_obj['name'])
-                st.download_button("📄 DOWNLOAD OFFICIAL SECTION 65B SCRB PDF DOSSIER (WITH 2D QR CODE)", data=pdf_dossier, file_name=f"SCRB_EVIDENCE_{chosen_cam_obj['cam_id']}.pdf", mime="application/pdf", type="primary", use_container_width=True)
-            else:
-                st.info(f"Scan complete in {elapsed}s. No vehicles with readable plates meeting the strict confidence threshold (>= 0.40) were detected in the {scanned_samples} sampled frames.")
         else:
-            st.warning("Please upload a valid CCTV footage file to proceed.")
+            # Live Stream DVR Ingest Mode
+            scan_progress = st.progress(0.2)
+            scan_status = st.empty()
+            scan_status.caption(f"Connecting to live stream for {chosen_cam_obj['name']}...")
+            
+            ret, burst_frames = capture_live_burst_frames(chosen_cam_obj, burst_count=5)
+            if not ret or not burst_frames:
+                ret, single_frame = capture_live_frame_from_stream(chosen_cam_obj)
+                burst_frames = [single_frame] if (ret and single_frame is not None) else []
+
+            scan_progress.progress(0.6)
+            total_frames = len(burst_frames)
+            scanned_samples = total_frames
+
+            if burst_frames:
+                for f_idx, frame in enumerate(burst_frames):
+                    fh, fw = frame.shape[:2]
+                    real_sec = f_idx * 0.066
+                    real_time_str = format_exact_pts(real_sec)
+
+                    with YOLO_INFERENCE_LOCK:
+                        res = yolo_model(frame, verbose=False, imgsz=480, conf=0.25)
+
+                    for r in res:
+                        for box in r.boxes:
+                            cls = int(box.cls[0])
+                            if cls in [2, 3, 5, 7]:
+                                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                                v_conf = float(box.conf[0])
+                                v_crop = frame[max(0, y1):min(fh, y2), max(0, x1):min(fw, x2)]
+                                
+                                ocr_hits = run_strict_ocr_on_crop(ocr_reader, v_crop)
+                                v_class_name = CLASS_NAMES.get(cls, "Vehicle")
+                                
+                                if ocr_hits:
+                                    for extracted_plate, ocr_c, isolated_plate_img in ocr_hits:
+                                        formatted_plate = format_dynamic_plate(extracted_plate)
+                                        is_match = False
+                                        match_score = round(ocr_c * 100, 1)
+                                        
+                                        if clean_target_plate:
+                                            is_match, match_score = is_real_target_match(clean_target_plate, extracted_plate)
+                                            
+                                        egujcop_match = lookup_egujcop_record(extracted_plate)
+                                        egujcop_tag = f"CRITICAL: {egujcop_match['fir_no']} ({egujcop_match['offence']})" if egujcop_match else "Clear (CCTNS Checked)"
+                                        
+                                        detection_record = {
+                                            "Frame Number": f_idx + 1,
+                                            "PTS Timestamp": real_time_str,
+                                            "PTS Seconds": real_sec,
+                                            "Vehicle Class": v_class_name,
+                                            "YOLO Confidence": f"{round(v_conf * 100, 1)}%",
+                                            "Detected Plate": formatted_plate,
+                                            "Plate Clean": clean_str(extracted_plate),
+                                            "OCR Confidence": f"{round(ocr_c * 100, 1)}%",
+                                            "Target Match": "YES (POSITIVE HIT)" if is_match else ("N/A" if not clean_target_plate else "NO"),
+                                            "Match Score": match_score,
+                                            "Is Target Match": is_match,
+                                            "eGujCop Status": egujcop_tag,
+                                            "eGujCop Rec": egujcop_match,
+                                            "Vehicle Crop RGB": cv2.cvtColor(v_crop, cv2.COLOR_BGR2RGB),
+                                            "Plate Crop RGB": cv2.cvtColor(isolated_plate_img, cv2.COLOR_BGR2RGB) if len(isolated_plate_img.shape) == 3 else isolated_plate_img,
+                                            "Checkpost Location": chosen_cam_obj["name"],
+                                            "City": chosen_cam_obj["city"],
+                                            "Lat": chosen_cam_obj["lat"],
+                                            "Lon": chosen_cam_obj["lon"]
+                                        }
+                                        raw_detections.append(detection_record)
+                                        if is_match:
+                                            target_hits.append(detection_record)
+                                            target_confirmed = True
+                                            break
+            else:
+                st.error(f"Could not connect to live DVR stream for {chosen_cam_obj['name']}. Please check network or select another checkpost node.")
+
+            scan_progress.progress(1.0)
+            scan_status.empty()
+
+        elapsed = round(time.time() - start_t, 2)
+
+        # ----------------- DISPLAY RESULTS -----------------
+        st.markdown(f"### Presentation Forensic Scan Summary ({elapsed}s execution time)")
+        
+        k_s1, k_s2, k_s3, k_s4 = st.columns(4)
+        with k_s1: render_metric_card("Frames Scanned", f"{scanned_samples} / {total_frames}", f"Skip Step: {frame_step_factor} Frames", color="blue")
+        with k_s2: render_metric_card("Plates Extracted", f"{len(raw_detections)} Readings", "Conf >= 0.35 Optical Ingest", color="green")
+        with k_s3: render_metric_card("Target Hits", f"{len(target_hits)} Matches" if clean_target_plate else "N/A (Full Scan)", "Authentic Watchlist Hits", color="red" if target_hits else "orange")
+        with k_s4: render_metric_card("Camera Node", chosen_cam_obj["cam_id"], f"{chosen_cam_obj['city']}", color="green")
+
+        if clean_target_plate:
+            if target_hits:
+                trigger_audio_sos()
+                top_match = target_hits[0]
+                trigger_voice_dispatch(f"Target Hit: Vehicle {top_match['Detected Plate']} intercepted at frame {top_match['Frame Number']}.")
+                wa_link = generate_whatsapp_dispatch_link(top_match['Detected Plate'], chosen_cam_obj['name'], chosen_cam_obj['lat'], chosen_cam_obj['lon'])
+
+                st.markdown(f"""
+                <div class="soc-alert-box-red">
+                    <div class="soc-alert-title" style="color: #9F1239;">🎯 TARGET POSITIVE INTERCEPT • [{top_match['Detected Plate']}]</div>
+                    <div class="soc-alert-body" style="color: #4C0519;">
+                        • <b>First Detected:</b> Frame #{top_match['Frame Number']} @ <code>{top_match['PTS Timestamp']}</code> (Hardware PTS)<br/>
+                        • <b>Vehicle Type:</b> {top_match['Vehicle Class']} (YOLO: {top_match['YOLO Confidence']} | OCR: {top_match['OCR Confidence']})<br/>
+                        • <b>Location:</b> <b>{chosen_cam_obj['name']} ({chosen_cam_obj['city']})</b><br/>
+                        • <b>Total Confirmed Sightings in Video:</b> {len(target_hits)} frames
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.link_button("DISPATCH EMERGENCY WHATSAPP PATROL ALERT", wa_link, use_container_width=True)
+            else:
+                st.markdown(f"""
+                <div class="soc-alert-box-orange">
+                    <div class="soc-alert-title" style="color: #C2410C;">⚠️ TARGET NOT FOUND IN SUPPLIED FOOTAGE</div>
+                    <div class="soc-alert-body" style="color: #7C2D12;">
+                        Target license plate <b>[{target_plate_input}]</b> was NOT detected in this footage (Scan completed in {elapsed}s: {scanned_samples} frames processed with genuine bounding boxes).
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        egujcop_hits_found = [d for d in raw_detections if d.get("eGujCop Rec")]
+        if egujcop_hits_found:
+            for eh in egujcop_hits_found[:2]:
+                r_rec = eh["eGujCop Rec"]
+                st.markdown(f"""
+                <div class="soc-alert-box-red">
+                    <div class="soc-alert-title" style="color: #9F1239;">🚨 eGujCop / CCTNS STOLEN VEHICLE ALERT • [{eh['Detected Plate']}]</div>
+                    <div class="soc-alert-body" style="color: #4C0519;">
+                        • <b>FIR Number:</b> {r_rec['fir_no']} | <b>Police Station:</b> {r_rec['police_station']}<br/>
+                        • <b>Crime Category:</b> {r_rec['offence']} (<code>{r_rec['sections']}</code>)<br/>
+                        • <b>Status:</b> <span class="soc-badge soc-badge-alert">{r_rec['status']}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        if raw_detections:
+            st.markdown("### Step 5: Real Video Frame Crops & Isolated Plate Evidence")
+            display_items = target_hits if (clean_target_plate and target_hits) else raw_detections
+            
+            unique_crops = []
+            seen_plates = set()
+            for d in display_items:
+                if d["Plate Clean"] not in seen_plates or len(unique_crops) < 4:
+                    seen_plates.add(d["Plate Clean"])
+                    unique_crops.append(d)
+                if len(unique_crops) >= 6:
+                    break
+
+            crop_cols = st.columns(min(3, len(unique_crops)))
+            for idx, item in enumerate(unique_crops[:6]):
+                with crop_cols[idx % 3]:
+                    st.image(item["Vehicle Crop RGB"], caption=f"Frame #{item['Frame Number']} @ {item['PTS Timestamp']} | {item['Vehicle Class']}", use_container_width=True)
+                    st.image(item["Plate Crop RGB"], caption=f"Isolated Plate: [{item['Detected Plate']}] (Conf: {item['OCR Confidence']})", use_container_width=True)
+
+            st.markdown("### Step 6: Millisecond-Accurate Forensic Detection Chronology")
+            
+            table_rows = []
+            for idx, item in enumerate(display_items):
+                table_rows.append({
+                    "Event ID": f"EVT-{idx+1:03d}",
+                    "Frame No": item["Frame Number"],
+                    "Entry Time": item["PTS Timestamp"],
+                    "Exit Time": item["PTS Timestamp"],
+                    "Peak Clarity Time": item["PTS Timestamp"],
+                    "Duration": f"Frame #{item['Frame Number']}",
+                    "Vehicle Type": item["Vehicle Class"],
+                    "Event Type": "TARGET HIT" if item["Is Target Match"] else "VEHICLE IDENTIFIED",
+                    "Consensus Plate / Details": f"License Plate: [{item['Detected Plate']}]",
+                    "Match Confidence": item["OCR Confidence"],
+                    "Checkpost Location": item["Checkpost Location"],
+                    "City": item["City"],
+                    "Lat": item["Lat"],
+                    "Lon": item["Lon"],
+                    "Plate_Clean": item["Plate Clean"],
+                    "eGujCop Status": item["eGujCop Status"],
+                    "Source": f"Forensic Scan ({chosen_cam_obj['cam_id']})"
+                })
+
+            df_forensic = pd.DataFrame(table_rows)
+            st.session_state["last_detection_logs"] = table_rows
+            st.session_state["all_cctv_sightings"].extend(table_rows)
+            st.dataframe(df_forensic[["Event ID", "Frame No", "Entry Time", "Vehicle Type", "Consensus Plate / Details", "Match Confidence", "eGujCop Status", "Checkpost Location"]], use_container_width=True)
+
+            pdf_dossier = generate_scrb_pdf_report(df_forensic, checkpost_source=chosen_cam_obj['name'])
+            st.download_button("📄 DOWNLOAD OFFICIAL SECTION 65B SCRB PDF DOSSIER (WITH 2D QR CODE)", data=pdf_dossier, file_name=f"SCRB_EVIDENCE_{chosen_cam_obj['cam_id']}.pdf", mime="application/pdf", type="primary", use_container_width=True)
+        else:
+            st.info(f"Scan completed in {elapsed}s across {scanned_samples} sampled frames. Real-time OCR filter active.")
 
 # ----------------- MODULE: FACIAL RECOGNITION & CCTNS MISSING PERSON SEARCH (FRS/NAFIS) -----------------
 elif nav_section == "Facial Recognition & CCTNS Missing Person Search (FRS/NAFIS)":
