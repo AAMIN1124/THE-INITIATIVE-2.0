@@ -3532,34 +3532,50 @@ else:
 # ----------------- DYNAMIC JURY / RTSP STREAM OVERRIDE WIDGET -----------------
 st.sidebar.markdown("### 📡 Zero-Delay RTSP Ingest Daemons")
 col_d1, col_d2 = st.sidebar.columns(2)
+
 cam14_obj = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == "14"), ACTIVE_CCTV_CATALOGUE[0])
 cam01_obj = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == "1"), ACTIVE_CCTV_CATALOGUE[0])
 
 with DAEMON_REGISTRY_LOCK:
-    is_c14_running = "CAM-14" in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS["CAM-14"].is_alive()
-    is_c01_running = "CAM-01" in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS["CAM-01"].is_alive()
+    is_c14_alive = "CAM-14" in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS["CAM-14"].is_alive()
+    is_c01_alive = "CAM-01" in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS["CAM-01"].is_alive()
 
-if col_d1.button("🟢 CAM-14" if not is_c14_running else "🛑 CAM-14", key="btn_d_c14", use_container_width=True):
-    if not is_c14_running:
-        start_camera_daemon(cam14_obj)
-        st.sidebar.success("Cam-14 Zero-Delay Ingest Started")
-    else:
-        stop_camera_daemon("CAM-14")
-        st.sidebar.info("Cam-14 Ingest Stopped")
-    st.rerun()
+# Persistent Toggle Switches
+with col_d1:
+    t_c14 = st.toggle("🟢 CAM-14", value=is_c14_alive, key="daemon_toggle_cam14")
+    if t_c14 != is_c14_alive:
+        if t_c14:
+            start_camera_daemon(cam14_obj)
+        else:
+            stop_camera_daemon("CAM-14")
+        st.rerun()
 
-if col_d2.button("🟢 CAM-01" if not is_c01_running else "🛑 CAM-01", key="btn_d_c01", use_container_width=True):
-    if not is_c01_running:
-        start_camera_daemon(cam01_obj)
-        st.sidebar.success("Cam-01 Zero-Delay Ingest Started")
-    else:
-        stop_camera_daemon("CAM-01")
-        st.sidebar.info("Cam-01 Ingest Stopped")
-    st.rerun()
+with col_d2:
+    t_c01 = st.toggle("🟢 CAM-01", value=is_c01_alive, key="daemon_toggle_cam01")
+    if t_c01 != is_c01_alive:
+        if t_c01:
+            start_camera_daemon(cam01_obj)
+        else:
+            stop_camera_daemon("CAM-01")
+        st.rerun()
 
 with DAEMON_REGISTRY_LOCK:
-    daemon_active_cnt = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
-st.sidebar.caption(f"**Ingest Status:** {daemon_active_cnt}/{MAX_CONCURRENT_DAEMONS} Active | Buffer: {len(st.session_state.get('all_cctv_sightings', []))} Sighting(s)")
+    active_daemon_count = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
+
+# Always sync global buffer to session sightings
+with GLOBAL_SIGHTINGS_LOCK:
+    for item in GLOBAL_SIGHTINGS_BUFFER:
+        if item not in st.session_state["all_cctv_sightings"]:
+            st.session_state["all_cctv_sightings"].append(item)
+
+total_sightings_count = len(st.session_state.get("all_cctv_sightings", []))
+daemon_color = "#10B981" if active_daemon_count > 0 else "#94A3B8"
+
+st.sidebar.markdown(f"""
+<div style="font-size: 0.78rem; font-weight: 700; color: #CBD5E1; margin-top: 6px;">
+    Ingest Status: <span style="color: {daemon_color}; font-weight: 800;">{active_daemon_count}/2 Active</span> | Buffer: <span style="color: #38BDF8; font-weight: 800;">{total_sightings_count} Sighting(s)</span>
+</div>
+""", unsafe_allow_html=True)
 
 with st.sidebar.expander("🔗 Dynamic External Stream Ingest (Jury URL/IP)", expanded=False):
     jury_stream_url = st.text_input("Custom RTSP / HTTP / IP Camera Stream URL", placeholder="rtsp://admin:pass@ip:port/h264 or http://...", key="jury_stream_url_input")
