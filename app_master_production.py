@@ -100,19 +100,7 @@ if "edge_bandwidth_mode" not in st.session_state:
     st.session_state.edge_bandwidth_mode = False
 
 if "officer_profile" not in st.session_state:
-    st.session_state.officer_profile = {
-        "name": "Officer Aamin",
-        "post": "Senior Cyber Forensic Examiner & ANPR Grid Lead",
-        "badge_id": "GP-SCRB-8842",
-        "dept": "State Crime Record Bureau (SCRB)",
-        "unit": "Cyber Intelligence & Video Forensics Command",
-        "station": "SCRB Cyber Command & Control Grid, Gandhinagar",
-        "phone": "+91 94280 11240",
-        "email": "aamin.scrb@gujarat.gov.in",
-        "clearance": "Level 4 (State Forensics & Intercept Clearance)",
-        "joining_date": "14-Feb-2021",
-        "avatar_bytes": None
-    }
+    st.session_state.officer_profile = load_saved_officer_profile()
 
 # Sync global background buffer into current session state
 with GLOBAL_SIGHTINGS_LOCK:
@@ -503,6 +491,110 @@ def get_db_connection():
     conn.execute("PRAGMA synchronous = NORMAL;")
     conn.row_factory = sqlite3.Row
     return conn
+
+import base64
+
+def init_officer_profile_store():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS officer_profile_store (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            post TEXT NOT NULL,
+            badge_id TEXT NOT NULL,
+            dept TEXT NOT NULL,
+            station TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            email TEXT NOT NULL,
+            clearance TEXT NOT NULL,
+            joining_date TEXT NOT NULL,
+            avatar_base64 TEXT
+        )
+        """)
+        cur.execute("SELECT COUNT(*) FROM officer_profile_store")
+        if cur.fetchone()[0] == 0:
+            cur.execute("""
+            INSERT INTO officer_profile_store 
+            (name, post, badge_id, dept, station, phone, email, clearance, joining_date, avatar_base64)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                "Officer Aamin",
+                "Senior Cyber Forensic Examiner & ANPR Grid Lead",
+                "GP-SCRB-8842",
+                "State Crime Record Bureau (SCRB)",
+                "SCRB Cyber Command & Control Grid, Gandhinagar",
+                "+91 94280 11240",
+                "aamin.scrb@gujarat.gov.in",
+                "Level 4 (State Forensics & Intercept Clearance)",
+                "14-Feb-2021",
+                None
+            ))
+            conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def load_saved_officer_profile():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM officer_profile_store ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+    except Exception:
+        pass
+    return {
+        "name": "Officer Aamin",
+        "post": "Senior Cyber Forensic Examiner & ANPR Grid Lead",
+        "badge_id": "GP-SCRB-8842",
+        "dept": "State Crime Record Bureau (SCRB)",
+        "station": "SCRB Cyber Command & Control Grid, Gandhinagar",
+        "phone": "+91 94280 11240",
+        "email": "aamin.scrb@gujarat.gov.in",
+        "clearance": "Level 4 (State Forensics & Intercept Clearance)",
+        "joining_date": "14-Feb-2021",
+        "avatar_base64": None
+    }
+
+def save_officer_profile_to_db(prof_dict):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM officer_profile_store")
+        cur.execute("""
+        INSERT INTO officer_profile_store 
+        (name, post, badge_id, dept, station, phone, email, clearance, joining_date, avatar_base64)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            prof_dict.get("name", "Officer Aamin"),
+            prof_dict.get("post", "Senior Cyber Forensic Examiner & ANPR Grid Lead"),
+            prof_dict.get("badge_id", "GP-SCRB-8842"),
+            prof_dict.get("dept", "State Crime Record Bureau (SCRB)"),
+            prof_dict.get("station", "SCRB Cyber Command & Control Grid, Gandhinagar"),
+            prof_dict.get("phone", "+91 94280 11240"),
+            prof_dict.get("email", "aamin.scrb@gujarat.gov.in"),
+            prof_dict.get("clearance", "Level 4 (State Forensics & Intercept Clearance)"),
+            prof_dict.get("joining_date", "14-Feb-2021"),
+            prof_dict.get("avatar_base64", None)
+        ))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+def render_officer_avatar_html(prof, size=42, border_color="#00E5FF", font_size="1.1rem"):
+    avatar_b64 = prof.get("avatar_base64")
+    if avatar_b64:
+        return f'<img src="data:image/jpeg;base64,{avatar_b64}" style="width: {size}px; height: {size}px; border-radius: 50%; object-fit: cover; border: 2.5px solid {border_color}; box-shadow: 0 0 12px rgba(0, 229, 255, 0.4); display: inline-block; vertical-align: middle;" />'
+    else:
+        initials = (prof.get("name", "OF")[:2] or "OF").upper()
+        return f'<div style="width: {size}px; height: {size}px; border-radius: 50%; background: #000000; color: {border_color}; font-size: {font_size}; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2.5px solid {border_color}; box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);">{initials}</div>'
+
 
 def init_db():
     try:
@@ -1509,7 +1601,7 @@ st.markdown("""
 
 # ----------------- REUSABLE UI COMPONENT HELPERS -----------------
 def render_header(module_name, officer_name=None):
-    prof = st.session_state.officer_profile
+    prof = st.session_state.get("officer_profile", load_saved_officer_profile())
     display_name = officer_name or prof.get("name", "Officer Aamin")
     with DAEMON_REGISTRY_LOCK:
         daemon_count = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
@@ -1518,6 +1610,12 @@ def render_header(module_name, officer_name=None):
     is_edge = st.session_state.get("edge_bandwidth_mode", False)
     edge_badge = '<span class="soc-badge soc-badge-edge">⚡ EDGE: 94% BW SAVED</span>' if is_edge else '<span class="soc-badge soc-badge-online">● 25/25 MESH ONLINE</span>'
     
+    avatar_b64 = prof.get("avatar_base64")
+    if avatar_b64:
+        user_badge = f'<span class="soc-badge soc-badge-black" style="display: inline-flex; align-items: center; gap: 6px;"><img src="data:image/jpeg;base64,{avatar_b64}" style="width: 18px; height: 18px; border-radius: 50%; object-fit: cover;" /> {display_name}</span>'
+    else:
+        user_badge = f'<span class="soc-badge soc-badge-black">{display_name}</span>'
+
     st.markdown(f"""
     <div class="soc-header">
         <div class="soc-header-left">
@@ -1528,7 +1626,7 @@ def render_header(module_name, officer_name=None):
             {edge_badge}
             <span class="soc-badge soc-badge-slate">{daemon_badge}</span>
             <span class="soc-badge soc-badge-black">SEC-65B QR READY</span>
-            <span class="soc-badge soc-badge-black">{display_name}</span>
+            {user_badge}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3230,10 +3328,8 @@ st.sidebar.markdown(f"""
 </div>
 
 <div class="sidebar-profile-card">
-    <div class="sidebar-avatar">
-        {prof['name'][:2].upper()}
-    </div>
-    <div style="display: flex; flex-direction: column; overflow: hidden;">
+    {render_officer_avatar_html(prof, size=44, border_color="#00E5FF", font_size="1.0rem")}
+    <div style="display: flex; flex-direction: column; overflow: hidden; margin-left: 10px;">
         <span style="font-size: 0.92rem; font-weight: 800; color: #FFFFFF !important; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{prof['name']}</span>
         <span style="font-size: 0.72rem; color: #FFFFFF !important; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{prof['post'][:25]}...</span>
         <span style="font-size: 0.68rem; color: #00E5FF !important; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">● {prof['badge_id']}</span>
@@ -3382,14 +3478,16 @@ if st.sidebar.button("LOCK TERMINAL (LOGOUT)", use_container_width=True):
 
 # ----------------- MODULE: OFFICER PROFILE & CREDENTIALS -----------------
 if nav_section == "Officer Profile & Credentials":
+    prof = st.session_state.get("officer_profile", load_saved_officer_profile())
     render_header("Officer Profile & Identity Credentials", prof["name"])
     st.markdown("### Officer Dossier & Departmental Credentials")
     p_col1, p_col2 = st.columns([1, 2])
     with p_col1:
+        hero_avatar_html = render_officer_avatar_html(prof, size=96, border_color="#00E5FF", font_size="2.2rem")
         st.markdown(f"""
         <div class="profile-hero-card" style="text-align: center;">
-            <div style="width: 90px; height: 90px; border-radius: 50%; background: #000000; color: #00E5FF; font-size: 2.2rem; font-weight: 900; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto; border: 3px solid #00E5FF; box-shadow: 0 0 20px rgba(0, 229, 255, 0.35);">
-                {prof['name'][:2].upper()}
+            <div style="display: flex; justify-content: center; margin-bottom: 14px;">
+                {hero_avatar_html}
             </div>
             <div style="font-size: 1.25rem; font-weight: 900; color: #0F172A;">{prof['name']}</div>
             <div style="font-size: 0.82rem; font-weight: 700; color: #0369A1; margin-top: 2px;">{prof['post']}</div>
@@ -3398,10 +3496,15 @@ if nav_section == "Officer Profile & Credentials":
             </div>
         </div>
         """, unsafe_allow_html=True)
-        uploaded_avatar = st.file_uploader("Change Profile Picture (JPG/PNG)", type=["jpg", "png", "jpeg"])
+        uploaded_avatar = st.file_uploader("Change Profile Picture (JPG/PNG)", type=["jpg", "png", "jpeg"], key="officer_dp_uploader")
         if uploaded_avatar is not None:
-            st.session_state.officer_profile["avatar_bytes"] = uploaded_avatar.read()
-            st.success("Profile photo updated.")
+            raw_bytes = uploaded_avatar.read()
+            b64_str = base64.b64encode(raw_bytes).decode("utf-8")
+            st.session_state.officer_profile["avatar_base64"] = b64_str
+            save_officer_profile_to_db(st.session_state.officer_profile)
+            st.success("Profile photo saved to permanent database.")
+            time.sleep(0.3)
+            st.rerun()
 
     with p_col2:
         st.markdown("#### Official Police Identity Details")
@@ -3427,9 +3530,10 @@ if nav_section == "Officer Profile & Credentials":
                 st.session_state.officer_profile["phone"] = edit_phone
                 st.session_state.officer_profile["email"] = edit_email
                 st.session_state.officer_profile["clearance"] = edit_clearance
+                save_officer_profile_to_db(st.session_state.officer_profile)
                 log_audit_trail(edit_name, f"Updated Officer Profile credentials for {edit_badge}")
-                st.success("Officer Identity Record successfully updated across the intelligence grid.")
-                time.sleep(0.4)
+                st.success("Officer Identity Record successfully saved to permanent database.")
+                time.sleep(0.3)
                 st.rerun()
 
 # ----------------- MODULE: GUJARAT 25 CCTV LIVE NETWORK -----------------
