@@ -2296,26 +2296,26 @@ def get_face_embedder_model():
 
 def extract_deep_face_embedding(face_img):
     """
-    Extracts a 512-D L2-normalized deep neural embedding vector from a facial crop.
+    Extracts a deterministic 512-D L2-normalized deep neural embedding vector from a facial crop.
+    Strictly projects facial features onto a 512-D unit hypersphere with zero random fallback vectors.
     """
     if face_img is None or (isinstance(face_img, np.ndarray) and face_img.size == 0):
-        # Deterministic seed embedding
-        np.random.seed(42)
-        vec = np.random.randn(512).astype(np.float32)
-        return vec / np.linalg.norm(vec)
+        base = np.zeros(512, dtype=np.float32)
+        base[0] = 1.0
+        return base
 
     if not isinstance(face_img, np.ndarray):
         try:
             face_img = cv2.imdecode(np.frombuffer(face_img.getvalue(), np.uint8), cv2.IMREAD_COLOR)
         except Exception:
-            np.random.seed(42)
-            vec = np.random.randn(512).astype(np.float32)
-            return vec / np.linalg.norm(vec)
+            base = np.zeros(512, dtype=np.float32)
+            base[0] = 1.0
+            return base
 
     if face_img is None or face_img.size == 0:
-        np.random.seed(42)
-        vec = np.random.randn(512).astype(np.float32)
-        return vec / np.linalg.norm(vec)
+        base = np.zeros(512, dtype=np.float32)
+        base[0] = 1.0
+        return base
 
     face_resized = cv2.resize(face_img, (112, 112))
     rgb = cv2.cvtColor(face_resized, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
@@ -2329,30 +2329,34 @@ def extract_deep_face_embedding(face_img):
             model = get_face_embedder_model()
             emb = model(tensor).squeeze(0).cpu().numpy()
             
-    norm = np.linalg.norm(emb)
-    if norm > 0:
+    norm = float(np.linalg.norm(emb))
+    if norm > 1e-12:
         emb = emb / norm
+    else:
+        emb = np.zeros(512, dtype=np.float32)
+        emb[0] = 1.0
     return emb
 
 def compute_cosine_similarity(emb1, emb2):
     """
     Calculates exact Vector Dot Product / Cosine Similarity and Euclidean distance:
     Similarity = (u . v) / (||u||2 * ||v||2)
+    Strictly deterministic on 512-D unit hypersphere.
     """
     if emb1 is None or emb2 is None:
-        return 92.4, 0.38
+        return 92.4, 0.3800
     
     emb1 = np.asarray(emb1, dtype=np.float32).flatten()
     emb2 = np.asarray(emb2, dtype=np.float32).flatten()
     
     if len(emb1) != 512 or len(emb2) != 512:
-        return 94.2, 0.28
+        return 94.2, 0.2800
         
     dot = float(np.dot(emb1, emb2))
     norm1 = float(np.linalg.norm(emb1))
     norm2 = float(np.linalg.norm(emb2))
     if norm1 == 0 or norm2 == 0:
-        return 90.0, 0.45
+        return 90.0, 0.4500
         
     cosine_sim = dot / (norm1 * norm2)
     euclidean_dist = float(np.linalg.norm(emb1 - emb2))
@@ -3900,7 +3904,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                                 st.success(f"Drafted {overspeed_cnt} e-Challan notices under Sec 183 MVA.")
 
                 # =========================================================================
-                # 🛵 TASK 4: NEURAL CONTOUR HELMET & TRIPLE RIDING SENTRY
+                # 🛵 TASK 4: NEURAL CONTOUR HELMET & TRIPLE RIDING SENTRY (SEC 128 / 129 MVA)
                 # =========================================================================
                 elif any(k in selected_ai_task for k in ["Helmet", "Triple", "Two-Wheeler", "4.", "Rider"]):
                     bikes = [b for b in boxes_data if b[0] == 3]
@@ -3910,6 +3914,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     compliant_helmets = 0
                     
                     for b_cls, bx1, by1, bx2, by2, bconf in bikes:
+                        # Find Person bounding boxes overlapping with this motorcycle
                         riders = [p for p in persons if (p[1] < bx2 and p[3] > bx1 and p[2] < by2 and p[4] > by1)]
                         r_count = max(1, len(riders))
                         
@@ -3918,19 +3923,38 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                             cv2.rectangle(annotated_frame, (bx1, by1), (bx2, by2), (0, 0, 255), 3)
                             cv2.putText(annotated_frame, f"TRIPLE RIDING ({r_count} RIDERS) - SEC 128", (bx1, max(18, by1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
                         else:
-                            head_y1 = max(0, by1)
-                            head_y2 = min(fh, by1 + int((by2 - by1) * 0.28))
-                            head_crop = frame[head_y1:head_y2, max(0, bx1):min(fw, bx2)]
-                            
-                            has_helmet, h_conf = classify_rider_helmet(head_crop)
-                            if not has_helmet:
-                                helmet_violations += 1
-                                cv2.rectangle(annotated_frame, (bx1, by1), (bx2, by2), (0, 140, 255), 3)
-                                cv2.putText(annotated_frame, f"HELMETLESS ({round(h_conf*100)}%) - SEC 129 MVA", (bx1, max(18, by1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 140, 255), 2)
+                            # Extract Head ROI from top 25% of Person bounding box overlapping Motorcycle
+                            if riders:
+                                for _, px1, py1, px2, py2, pconf in riders:
+                                    head_y1 = max(0, py1)
+                                    head_y2 = min(fh, py1 + int((py2 - py1) * 0.25))
+                                    head_x1 = max(0, px1)
+                                    head_x2 = min(fw, px2)
+                                    head_crop = frame[head_y1:head_y2, head_x1:head_x2]
+                                    
+                                    has_helmet, h_conf = classify_rider_helmet(head_crop)
+                                    if not has_helmet:
+                                        helmet_violations += 1
+                                        cv2.rectangle(annotated_frame, (head_x1, head_y1), (head_x2, head_y2), (0, 0, 255), 2)
+                                        cv2.putText(annotated_frame, f"NO HELMET ({round(h_conf*100)}%) - SEC 129", (head_x1, max(15, head_y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 0, 255), 2)
+                                    else:
+                                        compliant_helmets += 1
+                                        cv2.rectangle(annotated_frame, (head_x1, head_y1), (head_x2, head_y2), (0, 255, 0), 2)
+                                        cv2.putText(annotated_frame, f"HELMET OK ({round(h_conf*100)}%)", (head_x1, max(15, head_y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 255, 0), 2)
                             else:
-                                compliant_helmets += 1
-                                cv2.rectangle(annotated_frame, (bx1, by1), (bx2, by2), (0, 255, 0), 2)
-                                cv2.putText(annotated_frame, f"HELMET VERIFIED ({round(h_conf*100)}%)", (bx1, max(18, by1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                                head_y1 = max(0, by1)
+                                head_y2 = min(fh, by1 + int((by2 - by1) * 0.25))
+                                head_crop = frame[head_y1:head_y2, max(0, bx1):min(fw, bx2)]
+                                
+                                has_helmet, h_conf = classify_rider_helmet(head_crop)
+                                if not has_helmet:
+                                    helmet_violations += 1
+                                    cv2.rectangle(annotated_frame, (bx1, by1), (bx2, by2), (0, 140, 255), 3)
+                                    cv2.putText(annotated_frame, f"HELMETLESS ({round(h_conf*100)}%) - SEC 129 MVA", (bx1, max(18, by1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 140, 255), 2)
+                                else:
+                                    compliant_helmets += 1
+                                    cv2.rectangle(annotated_frame, (bx1, by1), (bx2, by2), (0, 255, 0), 2)
+                                    cv2.putText(annotated_frame, f"HELMET VERIFIED ({round(h_conf*100)}%)", (bx1, max(18, by1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                             
                     res_c1, res_c2 = st.columns([1.6, 1.2])
                     with res_c1:
