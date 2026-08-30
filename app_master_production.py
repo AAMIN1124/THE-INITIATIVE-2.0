@@ -1644,6 +1644,74 @@ st.markdown("""
         color: #F1F5F9 !important;
         -webkit-text-fill-color: #F1F5F9 !important;
     }
+    /* ========================================================================= */
+    /* SIDEBAR EXPANDER & INPUT HIGH-CONTRAST POLISH                            */
+    /* ========================================================================= */
+    section[data-testid="stSidebar"] [data-testid="stExpander"] {
+        background: rgba(14, 34, 74, 0.85) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1.5px solid rgba(56, 189, 248, 0.4) !important;
+        border-radius: 14px !important;
+        margin-top: 10px !important;
+        margin-bottom: 15px !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        color: #00E5FF !important;
+        -webkit-text-fill-color: #00E5FF !important;
+        font-weight: 800 !important;
+        font-size: 0.88rem !important;
+        letter-spacing: 0.4px !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary svg {
+        fill: #00E5FF !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] label,
+    section[data-testid="stSidebar"] [data-testid="stExpander"] p,
+    section[data-testid="stSidebar"] [data-testid="stExpander"] span {
+        color: #F1F5F9 !important;
+        -webkit-text-fill-color: #F1F5F9 !important;
+        font-weight: 600 !important;
+        font-size: 0.82rem !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] input,
+    section[data-testid="stSidebar"] [data-testid="stExpander"] div[data-baseweb="input"],
+    section[data-testid="stSidebar"] [data-testid="stExpander"] div[data-baseweb="select"] > div {
+        background: #0B1938 !important;
+        background-color: #0B1938 !important;
+        border: 1.5px solid rgba(56, 189, 248, 0.5) !important;
+        border-radius: 10px !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        font-size: 0.85rem !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] input::placeholder {
+        color: #94A3B8 !important;
+        -webkit-text-fill-color: #94A3B8 !important;
+    }
+
+    div[data-baseweb="popover"] div[role="listbox"],
+    div[data-baseweb="popover"] ul {
+        background-color: #0B1938 !important;
+        border: 1px solid rgba(56, 189, 248, 0.4) !important;
+        border-radius: 10px !important;
+    }
+
+    div[data-baseweb="popover"] li[role="option"] {
+        color: #F1F5F9 !important;
+        -webkit-text-fill-color: #F1F5F9 !important;
+    }
+
+    div[data-baseweb="popover"] li[role="option"]:hover {
+        background-color: #0284C7 !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
