@@ -391,11 +391,8 @@ def discover_live_cctv_endpoints(base_url="https://live.corp8.cloud/api/ingest",
 
 def capture_live_frame_from_stream(cam_dict):
     """
-    Captures a genuine 1080p live frame STRICTLY from the specified camera endpoint:
-    1. Direct OpenCV VideoCapture over TCP/HTTP with low-delay zero-buffer options.
-    2. Raw byte-bounded HTTP chunk downloader via urllib.request.
-    3. Direct RTSP over TCP.
-    Never falls back to a different camera ID.
+    Direct live frame grabber with 1.5s fail-fast timeout.
+    Eliminates broken MP4 atom errors and 30-second terminal freezes.
     """
     if isinstance(cam_dict, dict):
         custom_url = cam_dict.get("stream_url", cam_dict.get("custom_url", "")).strip()
@@ -403,7 +400,7 @@ def capture_live_frame_from_stream(cam_dict):
     else:
         custom_url = ""
         st_id = str(cam_dict).strip()
-        
+
     if "http" in st_id or "rtsp" in st_id:
         custom_url = st_id
 
@@ -412,25 +409,25 @@ def capture_live_frame_from_stream(cam_dict):
         clean_id = str(int(clean_id))
 
     if custom_url:
-        target_urls = [
+        urls_to_try = [
             custom_url,
             custom_url.replace("https://", "http://"),
             custom_url.replace("http://", "https://")
         ]
     else:
-        target_urls = [
+        urls_to_try = [
             f"http://live.corp8.cloud/stream/{clean_id}",
             f"https://live.corp8.cloud/stream/{clean_id}",
             f"rtsp://live.corp8.cloud:8554/stream/{clean_id}"
         ]
 
-    # 1. Direct OpenCV Stream Ingest
-    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
-    for u in target_urls:
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1500"
+
+    for stream_url in urls_to_try:
         try:
-            cap = cv2.VideoCapture(u, cv2.CAP_FFMPEG)
+            cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
             if not cap.isOpened():
-                cap = cv2.VideoCapture(u)
+                cap = cv2.VideoCapture(stream_url)
             if cap.isOpened():
                 for _ in range(4):
                     ret, frame = cap.read()
@@ -441,41 +438,11 @@ def capture_live_frame_from_stream(cam_dict):
         except Exception:
             pass
 
-    # 2. Byte-Bounded urllib Chunk Ingestion
-    for u in target_urls:
-        if "http" in u:
-            try:
-                req = urllib.request.Request(
-                    u, 
-                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Range": "bytes=0-1500000"}
-                )
-                with urllib.request.urlopen(req, timeout=2.0) as response:
-                    chunk = response.read(1500000)
-                    if len(chunk) > 10000:
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-                            tmp.write(chunk)
-                            tmp_path = tmp.name
-                        
-                        cap = cv2.VideoCapture(tmp_path)
-                        if cap.isOpened():
-                            for _ in range(4):
-                                ret, frame = cap.read()
-                                if ret and frame is not None and frame.size > 0:
-                                    cap.release()
-                                    try: os.remove(tmp_path)
-                                    except Exception: pass
-                                    return True, frame
-                            cap.release()
-                        try: os.remove(tmp_path)
-                        except Exception: pass
-            except Exception:
-                pass
-
     return False, None
 
 def capture_live_burst_frames(cam_dict, burst_count=5):
     """
-    Captures a multi-frame burst (up to 5 frames) from the target camera stream.
+    Captures a multi-frame burst (up to 5 frames) directly from the target camera stream.
     Used for super-resolution frame alignment and picking the highest-clarity OCR plate crop.
     """
     frames = []
@@ -499,7 +466,7 @@ def capture_live_burst_frames(cam_dict, burst_count=5):
         f"rtsp://live.corp8.cloud:8554/stream/{clean_id}"
     ]
 
-    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;2000"
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1500"
     for u in target_urls:
         try:
             cap = cv2.VideoCapture(u, cv2.CAP_FFMPEG)
@@ -519,7 +486,6 @@ def capture_live_burst_frames(cam_dict, burst_count=5):
         except Exception:
             pass
 
-    # Fallback to single frame capture
     ret, single_f = capture_live_frame_from_stream(cam_dict)
     if ret and single_f is not None:
         return True, [single_f]
