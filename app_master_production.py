@@ -3732,11 +3732,6 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         st.markdown("### 🟢 Verified & Perfectly Working Cameras (100% Tested Streams)")
         st.caption("These checkpost cameras have been tested for 100% active HLS/MP4 streams, low latency, high optical clarity, and zero buffering.")
 
-        vk1, vk2, vk3, vk4 = st.columns(4)
-        with vk1: render_metric_card("Verified Feeds", f"{len(VERIFIED_WORKING_CAMERAS)} / {len(ACTIVE_CCTV_CATALOGUE)} Tested", "100% Live Stream Integrity", color="green")
-        with vk2: render_metric_card("Average Latency", "11.2 ms", "Direct Edge Acceleration", color="blue")
-        with vk3: render_metric_card("Optical Clarity", "9.4 / 10", "Crisp License Plate OCR", color="orange")
-        with vk4: render_metric_card("Network Uptime", "100.0%", "No Signal Loss Detected", color="green")
 
         st.markdown("#### Live Verified Video Matrix")
         for i in range(0, len(VERIFIED_WORKING_CAMERAS), 2):
@@ -4382,11 +4377,6 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             """, unsafe_allow_html=True)
             render_cctv_live_container('14', height=320, border_color="rgba(186,230,253,0.8)", is_dual_main=True)
 
-        dt1, dt2, dt3, dt4 = st.columns(4)
-        with dt1: render_metric_card("Cam 01 Density", "42 Vehicles/Min", "🟢 Free Flow (AMTS Lane Clear)", color="green")
-        with dt2: render_metric_card("Cam 14 Signal Status", "RED STOP ACTIVE", "🔴 18 Stopped at Zebra Crossing", color="red")
-        with dt3: render_metric_card("Optical Sync Rate", "30.0 FPS", "Hardware GPU Decoded", color="orange")
-        with dt4: render_metric_card("State Mesh Ping", "10 ms", "live.corp8.cloud Gateway", color="blue")
 
     elif cctv_mode == "3. 5-Camera Multi-View Video Wall (Command Control Grid)":
         st.markdown("### 5-Camera Multi-View Video Wall (Command Control Grid)")
@@ -4437,11 +4427,6 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             found = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == str(cid)), ACTIVE_CCTV_CATALOGUE[0])
             cams_selected.append(found)
 
-        v_k1, v_k2, v_k3, v_k4 = st.columns(4)
-        with v_k1: render_metric_card("Active Video Wall", f"{len(cams_selected)}/5 Live", "100% GPU Synced", color="green")
-        with v_k2: render_metric_card("Combined Feed Rate", "150.0 FPS", "30 FPS Per Channel", color="blue")
-        with v_k3: render_metric_card("Network Throughput", "8.4 Mbps", "Ultra-Low Latency HLS/MP4", color="orange")
-        with v_k4: render_metric_card("Auto Target Radar", "ACTIVE", "Multi-Stream ANPR Intercept", color="red")
 
         if grid_layout == "Master 1 + 4 Quad Monitor (Command Room)":
             m_left, m_right = st.columns([1.5, 1.2])
@@ -4866,11 +4851,6 @@ elif nav_section == "Predictive Crime Hotspot AI Map":
     st.markdown("### AI Spatial Risk & Preventive Patrol Allocation")
     st.caption("Forecasts high-probability incident corridors based on historical CCTV violations, night traffic anomalies, and interstate transit patterns.")
 
-    m_h1, m_h2, m_h3, m_h4 = st.columns(4)
-    with m_h1: render_metric_card("High-Risk Hotspots", "03 Active", "Vadodara, Banaskantha, Ahmedabad", color="red")
-    with m_h2: render_metric_card("Recommended PCRs", "12 Units", "Night Geofence Allocation", color="orange")
-    with m_h3: render_metric_card("Night Risk Index", "High (11 PM - 4 AM)", "Interstate Truck Corridors", color="red")
-    with m_h4: render_metric_card("Predictive Accuracy", "91.4%", "Spatial Machine Learning", color="green")
 
     map_hotspot = folium.Map(location=[22.8, 71.8], zoom_start=8, tiles="OpenStreetMap")
     folium.Circle(location=[22.3000, 73.1800], radius=15000, color="#E11D48", fill=True, fill_color="#E11D48", fill_opacity=0.35, popup="<b>HOTSPOT 1: Vadodara Junction</b><br/>High RLVD & Intersection Breaches").add_to(map_hotspot)
@@ -5617,10 +5597,6 @@ elif nav_section == "Gujarat GIS Suspect Route Tracker":
     render_header("Gujarat GIS Suspect Route Tracker", prof["name"])
 
     active_logs = st.session_state.get("all_cctv_sightings", []) or st.session_state.get("last_detection_logs", [])
-    c1, c2, c3 = st.columns(3)
-    with c1: render_metric_card("Registered Cameras", str(len(ACTIVE_CCTV_CATALOGUE)), "All 25 Nodes Plotted", color="green")
-    with c2: render_metric_card("Detection Waypoints", str(len(active_logs)), "Waypoints from Forensic Buffer", color="red")
-    with c3: render_metric_card("Map Intelligence Grid", "ONLINE", "Leaflet Spatial GIS Layer", color="blue")
 
     m = folium.Map(location=[22.8, 71.8], zoom_start=8, tiles="OpenStreetMap")
     for cp in ACTIVE_CCTV_CATALOGUE:
@@ -5699,11 +5675,6 @@ elif nav_section == "Statewide CCTV Asset Registry & Gap Analysis":
     due_sla_count = len([c for c in cctv_registry_records if c.get("sla_status") == "Due in 15 Days"])
     border_gap_count = 14  # Calculated across Gujarat border perimeter
 
-    c_m1, c_m2, c_m3, c_m4 = st.columns(4)
-    with c_m1: render_metric_card("Department Assets", f"{total_assets} Registered", "Persistent SQLite Registry", color="green")
-    with c_m2: render_metric_card("Uncovered Border Gaps", f"{border_gap_count} Critical Nodes", "Rajasthan / MP Borders", color="red")
-    with c_m3: render_metric_card("SLA Renewal Notices", f"{due_sla_count + expired_sla_count} Contracts", f"{expired_sla_count} Expired | {due_sla_count} Due", color="orange")
-    with c_m4: render_metric_card("Grid Uptime", "99.2%", "Hardware Failover Ready", color="blue")
 
     col_reg1, col_reg2 = st.columns([1.2, 1])
     with col_reg1:
@@ -5848,11 +5819,6 @@ elif nav_section == "Section 65B SCRB Forensic Dossier":
 elif nav_section == "Server Health & Audit Logs":
     render_header("Server Health & Audit Logs", prof["name"])
 
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: render_metric_card("CPU Utilization", f"{psutil.cpu_percent()}%", f"{psutil.cpu_count()} Cores Active", color="orange")
-    with c2: render_metric_card("RAM Usage", f"{psutil.virtual_memory().percent}%", f"{round(psutil.virtual_memory().used / (1024**3), 1)} GB Used", color="red")
-    with c3: render_metric_card("Inference Architecture", "Decoupled YOLO/OCR Locks", "Zero Contention Multi-Threading", color="green")
-    with c4: render_metric_card("Gateway Network Ping", "12 ms", "live.corp8.cloud", color="blue")
 
     st.markdown("### Immutable Role-Based Audit Trail")
     if os.path.exists("audit_trail.csv"):
