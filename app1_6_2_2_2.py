@@ -79,6 +79,123 @@ if "DAEMON_STOP_EVENTS" not in globals():
     DAEMON_STOP_EVENTS = {}
 MAX_CONCURRENT_DAEMONS = 2
 
+# ----------------- EMBEDDED SQLITE DATABASE & PROFILE PERSISTENCE LAYER -----------------
+import base64
+import sqlite3
+
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scrb_master.db")
+
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH, timeout=15.0, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_officer_profile_store():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS officer_profile_store (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            post TEXT NOT NULL,
+            badge_id TEXT NOT NULL,
+            dept TEXT NOT NULL,
+            station TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            email TEXT NOT NULL,
+            clearance TEXT NOT NULL,
+            joining_date TEXT NOT NULL,
+            avatar_base64 TEXT
+        )
+        """)
+        cur.execute("SELECT COUNT(*) FROM officer_profile_store")
+        if cur.fetchone()[0] == 0:
+            cur.execute("""
+            INSERT INTO officer_profile_store 
+            (name, post, badge_id, dept, station, phone, email, clearance, joining_date, avatar_base64)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                "Officer Aamin",
+                "Senior Cyber Forensic Examiner & ANPR Grid Lead",
+                "GP-SCRB-8842",
+                "State Crime Record Bureau (SCRB)",
+                "SCRB Cyber Command & Control Grid, Gandhinagar",
+                "+91 94280 11240",
+                "aamin.scrb@gujarat.gov.in",
+                "Level 4 (State Forensics & Intercept Clearance)",
+                "14-Feb-2021",
+                None
+            ))
+            conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def load_saved_officer_profile():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM officer_profile_store ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+    except Exception:
+        pass
+    return {
+        "name": "Officer Aamin",
+        "post": "Senior Cyber Forensic Examiner & ANPR Grid Lead",
+        "badge_id": "GP-SCRB-8842",
+        "dept": "State Crime Record Bureau (SCRB)",
+        "station": "SCRB Cyber Command & Control Grid, Gandhinagar",
+        "phone": "+91 94280 11240",
+        "email": "aamin.scrb@gujarat.gov.in",
+        "clearance": "Level 4 (State Forensics & Intercept Clearance)",
+        "joining_date": "14-Feb-2021",
+        "avatar_base64": None
+    }
+
+def save_officer_profile_to_db(prof_dict):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM officer_profile_store")
+        cur.execute("""
+        INSERT INTO officer_profile_store 
+        (name, post, badge_id, dept, station, phone, email, clearance, joining_date, avatar_base64)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            prof_dict.get("name", "Officer Aamin"),
+            prof_dict.get("post", "Senior Cyber Forensic Examiner & ANPR Grid Lead"),
+            prof_dict.get("badge_id", "GP-SCRB-8842"),
+            prof_dict.get("dept", "State Crime Record Bureau (SCRB)"),
+            prof_dict.get("station", "SCRB Cyber Command & Control Grid, Gandhinagar"),
+            prof_dict.get("phone", "+91 94280 11240"),
+            prof_dict.get("email", "aamin.scrb@gujarat.gov.in"),
+            prof_dict.get("clearance", "Level 4 (State Forensics & Intercept Clearance)"),
+            prof_dict.get("joining_date", "14-Feb-2021"),
+            prof_dict.get("avatar_base64", None)
+        ))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+def render_officer_avatar_html(prof, size=42, border_color="#00E5FF", font_size="1.1rem"):
+    avatar_b64 = prof.get("avatar_base64")
+    if avatar_b64:
+        return f'<img src="data:image/jpeg;base64,{avatar_b64}" style="width: {size}px; height: {size}px; border-radius: 50%; object-fit: cover; border: 2.5px solid {border_color}; box-shadow: 0 0 12px rgba(0, 229, 255, 0.4); display: inline-block; vertical-align: middle;" />'
+    else:
+        initials = (prof.get("name", "OF")[:2] or "OF").upper()
+        return f'<div style="width: {size}px; height: {size}px; border-radius: 50%; background: #000000; color: {border_color}; font-size: {font_size}; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2.5px solid {border_color}; box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);">{initials}</div>'
+
+# Initialize Profile Storage First
+init_officer_profile_store()
+
 # ----------------- SESSION STATE INITIALIZATION -----------------
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -480,122 +597,8 @@ def capture_live_burst_frames(cam_dict, burst_count=5):
     return False, []
 
 # ----------------- EMBEDDED SQLITE MASTER DATABASE & REPOSITORY LAYER -----------------
-import sqlite3
-
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scrb_master.db")
-
-def get_db_connection():
-    conn = sqlite3.connect(DB_PATH, timeout=15.0, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode = WAL;")
-    conn.execute("PRAGMA synchronous = NORMAL;")
-    conn.row_factory = sqlite3.Row
-    return conn
-
-import base64
-
-def init_officer_profile_store():
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS officer_profile_store (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            post TEXT NOT NULL,
-            badge_id TEXT NOT NULL,
-            dept TEXT NOT NULL,
-            station TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            email TEXT NOT NULL,
-            clearance TEXT NOT NULL,
-            joining_date TEXT NOT NULL,
-            avatar_base64 TEXT
-        )
-        """)
-        cur.execute("SELECT COUNT(*) FROM officer_profile_store")
-        if cur.fetchone()[0] == 0:
-            cur.execute("""
-            INSERT INTO officer_profile_store 
-            (name, post, badge_id, dept, station, phone, email, clearance, joining_date, avatar_base64)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                "Officer Aamin",
-                "Senior Cyber Forensic Examiner & ANPR Grid Lead",
-                "GP-SCRB-8842",
-                "State Crime Record Bureau (SCRB)",
-                "SCRB Cyber Command & Control Grid, Gandhinagar",
-                "+91 94280 11240",
-                "aamin.scrb@gujarat.gov.in",
-                "Level 4 (State Forensics & Intercept Clearance)",
-                "14-Feb-2021",
-                None
-            ))
-            conn.commit()
-        conn.close()
-    except Exception:
-        pass
-
-def load_saved_officer_profile():
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM officer_profile_store ORDER BY id DESC LIMIT 1")
-        row = cur.fetchone()
-        conn.close()
-        if row:
-            return dict(row)
-    except Exception:
-        pass
-    return {
-        "name": "Officer Aamin",
-        "post": "Senior Cyber Forensic Examiner & ANPR Grid Lead",
-        "badge_id": "GP-SCRB-8842",
-        "dept": "State Crime Record Bureau (SCRB)",
-        "station": "SCRB Cyber Command & Control Grid, Gandhinagar",
-        "phone": "+91 94280 11240",
-        "email": "aamin.scrb@gujarat.gov.in",
-        "clearance": "Level 4 (State Forensics & Intercept Clearance)",
-        "joining_date": "14-Feb-2021",
-        "avatar_base64": None
-    }
-
-def save_officer_profile_to_db(prof_dict):
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM officer_profile_store")
-        cur.execute("""
-        INSERT INTO officer_profile_store 
-        (name, post, badge_id, dept, station, phone, email, clearance, joining_date, avatar_base64)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            prof_dict.get("name", "Officer Aamin"),
-            prof_dict.get("post", "Senior Cyber Forensic Examiner & ANPR Grid Lead"),
-            prof_dict.get("badge_id", "GP-SCRB-8842"),
-            prof_dict.get("dept", "State Crime Record Bureau (SCRB)"),
-            prof_dict.get("station", "SCRB Cyber Command & Control Grid, Gandhinagar"),
-            prof_dict.get("phone", "+91 94280 11240"),
-            prof_dict.get("email", "aamin.scrb@gujarat.gov.in"),
-            prof_dict.get("clearance", "Level 4 (State Forensics & Intercept Clearance)"),
-            prof_dict.get("joining_date", "14-Feb-2021"),
-            prof_dict.get("avatar_base64", None)
-        ))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception:
-        return False
-
-def render_officer_avatar_html(prof, size=42, border_color="#00E5FF", font_size="1.1rem"):
-    avatar_b64 = prof.get("avatar_base64")
-    if avatar_b64:
-        return f'<img src="data:image/jpeg;base64,{avatar_b64}" style="width: {size}px; height: {size}px; border-radius: 50%; object-fit: cover; border: 2.5px solid {border_color}; box-shadow: 0 0 12px rgba(0, 229, 255, 0.4); display: inline-block; vertical-align: middle;" />'
-    else:
-        initials = (prof.get("name", "OF")[:2] or "OF").upper()
-        return f'<div style="width: {size}px; height: {size}px; border-radius: 50%; background: #000000; color: {border_color}; font-size: {font_size}; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2.5px solid {border_color}; box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);">{initials}</div>'
-
-
 def init_db():
+    init_officer_profile_store()
     try:
         conn = get_db_connection()
         cur = conn.cursor()
