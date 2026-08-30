@@ -1643,29 +1643,45 @@ st.markdown("""
         color: #F1F5F9 !important;
         -webkit-text-fill-color: #F1F5F9 !important;
     }
-    /* ========================================================================= */
-    /* SIDEBAR EXPANDER & INPUT HIGH-CONTRAST POLISH                            */
+        /* ========================================================================= */
+    /* FIX: SIDEBAR EXPANDER WHITE BOX & SELECTBOX ARROW GLITCH                  */
     /* ========================================================================= */
     section[data-testid="stSidebar"] [data-testid="stExpander"] {
-        background: rgba(14, 34, 74, 0.85) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        border: 1.5px solid rgba(56, 189, 248, 0.4) !important;
+        background: #0B1938 !important;
+        background-color: #0B1938 !important;
+        border: 1.5px solid rgba(56, 189, 248, 0.45) !important;
         border-radius: 14px !important;
+        overflow: hidden !important;
         margin-top: 10px !important;
         margin-bottom: 15px !important;
     }
 
+    section[data-testid="stSidebar"] [data-testid="stExpander"] details,
     section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        background: #07152E !important;
+        background-color: #07152E !important;
         color: #00E5FF !important;
         -webkit-text-fill-color: #00E5FF !important;
         font-weight: 800 !important;
-        font-size: 0.88rem !important;
-        letter-spacing: 0.4px !important;
+        font-size: 0.86rem !important;
+        padding: 10px 14px !important;
+        border-radius: 12px 12px 0 0 !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {
+        background: #0C234C !important;
+        color: #38BDF8 !important;
     }
 
     section[data-testid="stSidebar"] [data-testid="stExpander"] summary svg {
         fill: #00E5FF !important;
+        color: #00E5FF !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] div[data-testid="stExpanderDetails"] {
+        background: #0B1938 !important;
+        background-color: #0B1938 !important;
+        padding: 12px 14px 16px 14px !important;
     }
 
     section[data-testid="stSidebar"] [data-testid="stExpander"] label,
@@ -1677,21 +1693,28 @@ st.markdown("""
         font-size: 0.82rem !important;
     }
 
-    section[data-testid="stSidebar"] [data-testid="stExpander"] input,
-    section[data-testid="stSidebar"] [data-testid="stExpander"] div[data-baseweb="input"],
-    section[data-testid="stSidebar"] [data-testid="stExpander"] div[data-baseweb="select"] > div {
+    /* Fix Selectbox container & right arrow area */
+    section[data-testid="stSidebar"] div[data-baseweb="select"],
+    section[data-testid="stSidebar"] div[data-baseweb="select"] > div,
+    section[data-testid="stSidebar"] div[data-baseweb="select"] * {
         background: #0B1938 !important;
         background-color: #0B1938 !important;
-        border: 1.5px solid rgba(56, 189, 248, 0.5) !important;
-        border-radius: 10px !important;
+        border-color: rgba(56, 189, 248, 0.45) !important;
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
-        font-size: 0.85rem !important;
     }
 
-    section[data-testid="stSidebar"] [data-testid="stExpander"] input::placeholder {
-        color: #94A3B8 !important;
-        -webkit-text-fill-color: #94A3B8 !important;
+    section[data-testid="stSidebar"] div[data-baseweb="select"] svg {
+        fill: #00E5FF !important;
+        color: #00E5FF !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] input {
+        background: #0B1938 !important;
+        background-color: #0B1938 !important;
+        border: 1.5px solid rgba(56, 189, 248, 0.45) !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
     }
 
     div[data-baseweb="popover"] div[role="listbox"],
