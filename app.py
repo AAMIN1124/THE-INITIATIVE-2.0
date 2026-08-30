@@ -2900,14 +2900,15 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         st.markdown(full_html, unsafe_allow_html=True)
 
 # ----------------- REAL-TIME ZERO-BUFFER RTSP BACKGROUND WORKER DAEMON -----------------
-def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
+def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo_model=None, ocr_reader=None):
     """
     Gujarat Police Hackathon 2026 Background RTSP Daemon:
     1. Reads dynamic stream properties and forces RTSP over TCP transport.
     2. Extracts hardware PTS via cv2.CAP_PROP_POS_MSEC (never wall-clock or FPS).
     3. Handles loop discontinuities gracefully without dropping connections.
     4. Auto-reconnects with exponential backoff (2.0s to 30.0s).
-    5. Strict try...finally lifecycle guaranteeing cv2.VideoCapture release and zero leaks.
+    5. Uses pre-loaded AI model instances passed from main thread to avoid Streamlit ScriptRunContext detached thread crash.
+    6. Strict try...finally lifecycle guaranteeing cv2.VideoCapture release and zero leaks.
     """
     if isinstance(cam_obj, dict):
         cam_id = str(cam_obj.get("cam_id", cam_obj.get("stream_id", "CAM-01")))
@@ -2926,11 +2927,13 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
     if "-" in st_id:
         st_id = st_id.split("-")[-1]
     clean_id = str(int(st_id)) if st_id.isdigit() else st_id
-    
-    try:
-        yolo_model, ocr_reader = get_ai_models()
-    except Exception:
-        return
+
+    # Fallback to local model load only if not passed from main thread
+    if yolo_model is None or ocr_reader is None:
+        try:
+            yolo_model, ocr_reader = get_ai_models()
+        except Exception:
+            pass
 
     backoff_delay = 2.0
     max_backoff = 30.0
@@ -3079,6 +3082,13 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8):
 
 def start_camera_daemon(cam_obj):
     cid = cam_obj.get("cam_id", cam_obj.get("stream_id", "CAM-01")) if isinstance(cam_obj, dict) else str(cam_obj)
+    
+    # Pre-fetch models in main thread before spawning worker to prevent detached thread crash
+    try:
+        yolo_model, ocr_reader = get_ai_models()
+    except Exception:
+        yolo_model, ocr_reader = None, None
+
     with DAEMON_REGISTRY_LOCK:
         if cid in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS[cid].is_alive():
             return
@@ -3094,7 +3104,11 @@ def start_camera_daemon(cam_obj):
 
         stop_event = threading.Event()
         DAEMON_STOP_EVENTS[cid] = stop_event
-        t = threading.Thread(target=background_rtsp_ingest_worker, args=(cam_obj, stop_event, 1.8), daemon=True)
+        t = threading.Thread(
+            target=background_rtsp_ingest_worker, 
+            args=(cam_obj, stop_event, 1.8, yolo_model, ocr_reader), 
+            daemon=True
+        )
         ACTIVE_DAEMON_THREADS[cid] = t
         t.start()
 
@@ -3107,7 +3121,6 @@ def stop_camera_daemon(cid):
                 del ACTIVE_DAEMON_THREADS[cid]
             except Exception:
                 pass
-
 # ----------------- GUJARAT HIGHWAY TOPOLOGY CORRIDOR ROUTING -----------------
 def compute_predictive_trajectory(sightings_list):
     if len(sightings_list) < 2:
