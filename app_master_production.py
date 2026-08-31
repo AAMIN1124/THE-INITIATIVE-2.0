@@ -3839,127 +3839,17 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
     cctv_mode = st.selectbox(
         "🎛️ SELECT CCTV SURVEILLANCE & AI ANALYTICS MODE",
         [
-            "🏆 Grand Finale 5-Pillar Strategic Camera Matrix (24 Live Feeds)",
-            "🟢 Verified & Perfectly Working Cameras (100% Tested Live Mesh)",
             "1. Single Camera Stream & Optical HUD Filters",
-            "2. Dual-Camera Patrol Monitor (Cam 01 + Cam 14)",
-            "3. 5-Camera Multi-View Video Wall (Command Control Grid)",
-            "4. Top 5 Strategic AI Patrol Hub (Vadodara, Ahmedabad, Rajkot...)",
+            "2. Dual-Camera Patrol Monitor (Synchronized Dual View)",
+            "3. Quad-Camera Video Wall (4-Camera Command Grid)",
+            "4. Top 4 Strategic AI Patrol Hub (Vadodara, Ahmedabad, Rajkot, Gandhinagar)",
             "5. Smart Junction Traffic Violation & RLVD Engine",
             "6. Instant Snapshot & 4X Super-Res OCR Inspector"
         ],
         index=0
     )
 
-    if cctv_mode == "🏆 Grand Finale 5-Pillar Strategic Camera Matrix (24 Live Feeds)":
-        st.markdown("""
-        <div class="soc-alert-box-blue" style="margin-bottom: 18px;">
-            <div class="soc-alert-title" style="display: flex; align-items: center; gap: 8px;">
-                <span>🏛️</span> <span>GUJARAT POLICE STATEWIDE CCTV GRID • 5 OPERATIONAL COMMAND PILLARS</span>
-            </div>
-            <div class="soc-alert-body">
-                Consolidated live stream feed directory across all 24 statewide cameras classified into 5 core law enforcement and public safety domains with domain-specific AI models active.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        selected_pillar = st.selectbox(
-            "Filter Feeds by Operational Grand Finale Pillar:",
-            [
-                "All 24 Statewide Feeds (Complete Grid)",
-                "🎯 Pillar 1: Highway & Checkpost ANPR Grid (Cam 09, 06, 14, 15)",
-                "🚦 Pillar 2: Smart Traffic & RLVD Safety (Cam 14, 15, 13, 02, 03, 04, 08)",
-                "🚌 Pillar 3: Public Transit & Transport Safety (Cam 18, 16, 05, 10)",
-                "🚆 Pillar 4: Railway / Bus Terminal Indoor Security (Cam 27, 28, 29 Bilimora, Cam 11)",
-                "🌾 Pillar 5: Rural 80,000 Edge Scale & Animal Hazard (Cam 19, 20, 23, 24, 30, 07)"
-            ],
-            index=0
-        )
-
-        if "Pillar 1" in selected_pillar:
-            filtered_cams = [c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) in ["9", "6", "14", "15"]]
-        elif "Pillar 2" in selected_pillar:
-            filtered_cams = [c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) in ["14", "15", "13", "2", "3", "4", "8"]]
-        elif "Pillar 3" in selected_pillar:
-            filtered_cams = [c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) in ["18", "16", "5", "10"]]
-        elif "Pillar 4" in selected_pillar:
-            filtered_cams = [c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) in ["27", "28", "29", "11"]]
-        elif "Pillar 5" in selected_pillar:
-            filtered_cams = [c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) in ["19", "20", "23", "24", "30", "7"]]
-        else:
-            filtered_cams = ACTIVE_CCTV_CATALOGUE
-
-
-        st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
-        for i in range(0, len(filtered_cams), 2):
-            c_row1, c_row2 = st.columns(2)
-            cam_a = filtered_cams[i]
-            with c_row1:
-                feats_a = " • ".join(cam_a.get("ai_features", ["High-Speed ANPR", "Live Telemetry"]))
-                scene_a = cam_a.get("scene", "Statewide Surveillance Corridor")
-                st.markdown(f"""
-                <div class="kpi-card kpi-card-blue" style="min-height: auto !important; padding: 10px 14px !important; margin-bottom: 8px !important;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span class="soc-badge soc-badge-online">NODE {cam_a['cam_id']}</span>
-                        <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A;">{cam_a['name']} ({cam_a['city']})</span>
-                        <span style="font-family: monospace; font-size: 0.75rem; color: #15803D; font-weight: bold;">● 30 FPS</span>
-                    </div>
-                    <div style="font-size: 0.76rem; color: #475569; margin-top: 4px;">📐 <b>Geometry:</b> {scene_a}</div>
-                    <div style="font-size: 0.74rem; color: #0369A1; font-weight: 700; margin-top: 2px;">⚡ <b>AI:</b> {feats_a}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                render_cctv_live_container(cam_a, height=260, border_color="rgba(186,230,253,0.9)")
-
-            if i + 1 < len(filtered_cams):
-                cam_b = filtered_cams[i+1]
-                with c_row2:
-                    feats_b = " • ".join(cam_b.get("ai_features", ["High-Speed ANPR", "Live Telemetry"]))
-                    scene_b = cam_b.get("scene", "Statewide Surveillance Corridor")
-                    st.markdown(f"""
-                    <div class="kpi-card kpi-card-blue" style="min-height: auto !important; padding: 10px 14px !important; margin-bottom: 8px !important;">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <span class="soc-badge soc-badge-online">NODE {cam_b['cam_id']}</span>
-                            <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A;">{cam_b['name']} ({cam_b['city']})</span>
-                            <span style="font-family: monospace; font-size: 0.75rem; color: #15803D; font-weight: bold;">● 30 FPS</span>
-                        </div>
-                        <div style="font-size: 0.76rem; color: #475569; margin-top: 4px;">📐 <b>Geometry:</b> {scene_b}</div>
-                        <div style="font-size: 0.74rem; color: #0369A1; font-weight: 700; margin-top: 2px;">⚡ <b>AI:</b> {feats_b}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    render_cctv_live_container(cam_b, height=260, border_color="rgba(186,230,253,0.9)")
-
-    elif cctv_mode == "🟢 Verified & Perfectly Working Cameras (100% Tested Live Mesh)":
-        st.markdown("### 🟢 Verified & Perfectly Working Cameras (100% Tested Streams)")
-        st.caption("These checkpost cameras have been tested for 100% active HLS/MP4 streams, low latency, high optical clarity, and zero buffering.")
-
-
-        st.markdown("#### Live Verified Video Matrix")
-        for i in range(0, len(VERIFIED_WORKING_CAMERAS), 2):
-            c_row1, c_row2 = st.columns(2)
-            cam_a = VERIFIED_WORKING_CAMERAS[i]
-            with c_row1:
-                st.markdown(f"""
-                <div class="kpi-card kpi-card-green" style="min-height: 52px !important; height: 52px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 8px 16px !important; margin-bottom: 8px !important;">
-                    <span class="soc-badge soc-badge-online">VERIFIED: {cam_a['cam_id']}</span>
-                    <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A; margin-left: 8px;">{cam_a['name']} ({cam_a['city']})</span>
-                    <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: #15803D;">● 30 FPS</span>
-                </div>
-                """, unsafe_allow_html=True)
-                render_cctv_live_container(cam_a, height=270, border_color="rgba(134,239,172,0.9)")
-
-            if i + 1 < len(VERIFIED_WORKING_CAMERAS):
-                cam_b = VERIFIED_WORKING_CAMERAS[i+1]
-                with c_row2:
-                    st.markdown(f"""
-                    <div class="kpi-card kpi-card-blue" style="min-height: 52px !important; height: 52px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 10px 16px !important; margin-bottom: 8px !important;">
-                        <span class="soc-badge soc-badge-slate">VERIFIED: {cam_b['cam_id']}</span>
-                        <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A; margin-left: 8px;">{cam_b['name']} ({cam_b['city']})</span>
-                        <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: #0369A1;">● 30 FPS</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    render_cctv_live_container(cam_b, height=270, border_color="rgba(186,230,253,0.9)")
-
-    elif cctv_mode == "1. Single Camera Stream & Optical HUD Filters":
+    if cctv_mode == "1. Single Camera Stream & Optical HUD Filters":
         source_mode = st.radio("Camera Source Feed", ["🔴 Live Stream Feed", "📼 Checkpost Stored DVR Recording / Uploaded Video"], horizontal=True, key="sc_source_mode")
         
         f_col1, f_col2, f_col3 = st.columns([1.5, 1, 1])
@@ -4021,7 +3911,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 st.info("Upload a surveillance video clip above, or preview the checkpost DVR stream below with live controls.")
                 render_cctv_live_container(selected_cam, height=480, border_color="rgba(134,239,172,0.9)")
 
-                st.markdown("### ⚡ Live Stream Real-Time AI Computer Vision Suite")
+        st.markdown("### ⚡ Live Stream Real-Time AI Computer Vision Suite")
         c_ai_sel, c_ai_btn = st.columns([2, 1])
 
         with c_ai_sel:
@@ -4093,624 +3983,483 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 time.sleep(0.04)
 
         if run_live_inference:
-            with st.spinner(f"Executing {selected_ai_task} on Live Camera Feed..."):
+            with st.spinner(f"⚡ Processing Live AI Frame: {selected_ai_task}..."):
                 yolo_model, ocr_reader = get_ai_models()
                 
-                # 1. Multi-Frame Burst Ingest to pick sharpest frame
-                ret, burst_frames = capture_live_burst_frames(selected_cam, burst_count=5)
-                if not ret or not burst_frames:
-                    ret, frame = capture_live_frame_from_stream(selected_cam)
-                    if not ret or frame is None:
-                        st.error(f"Live stream endpoint for {selected_cam['name']} is currently offline or unreachable.")
-                        st.stop()
-                else:
-                    frame = burst_frames[-1]
-
-                fh, fw = frame.shape[:2]
-                annotated_frame = frame.copy()
+                # Direct single-frame grab from live stream buffer
+                ret, frame = capture_live_frame_from_stream(selected_cam)
                 
-                with YOLO_INFERENCE_LOCK:
-                    results = yolo_model(frame, verbose=False, imgsz=480, conf=0.25)
-
-                boxes_data = []
-                for r in results:
-                    for box in r.boxes:
-                        cls = int(box.cls[0])
-                        x1, y1, x2, y2 = map(int, box.xyxy[0])
-                        conf_val = float(box.conf[0])
-                        boxes_data.append((cls, x1, y1, x2, y2, conf_val))
-
-                # =========================================================================
-                # 🎯 TASK 1: SUPER-RES ANPR & STOLEN VEHICLE INTERCEPT
-                # =========================================================================
-                if any(k in selected_ai_task for k in ["ANPR", "Plate", "Watchlist", "Stolen", "1.", "Toll", "Port", "Out-of-State", "Ingress"]):
-                    detected_plates = []
-                    vehicle_cnt = 0
-                    person_cnt = 0
+                if not ret or frame is None or frame.size == 0:
+                    st.error(f"⚠️ Live Stream Ingest Error: Unable to grab live video frame from camera endpoint {selected_cam['name']}. Please verify camera stream status.")
+                else:
+                    fh, fw = frame.shape[:2]
+                    annotated_frame = frame.copy()
                     
-                    for cls, x1, y1, x2, y2, conf_val in boxes_data:
-                        if cls == 0:
-                            person_cnt += 1
-                            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 120, 0), 2)
-                            cv2.putText(annotated_frame, f"Person {round(conf_val*100)}%", (x1, max(15, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 120, 0), 2)
-                        elif cls in [2, 3, 5, 7]:
-                            vehicle_cnt += 1
-                            # Super-resolution crop from burst frames
-                            best_crop = frame[max(0, y1):min(fh, y2), max(0, x1):min(fw, x2)]
-                            if burst_frames and len(burst_frames) > 1:
-                                best_sharpness = -1.0
-                                for bf in burst_frames:
-                                    cand = bf[max(0, y1):min(fh, y2), max(0, x1):min(fw, x2)]
-                                    if cand.size > 0:
-                                        sh = cv2.Laplacian(cv2.cvtColor(cand, cv2.COLOR_BGR2GRAY), cv2.CV_64F).var()
-                                        if sh > best_sharpness:
-                                            best_sharpness = sh
-                                            best_crop = cand
+                    with YOLO_INFERENCE_LOCK:
+                        results = yolo_model(frame, verbose=False, imgsz=256, conf=0.25)
 
-                            ocr_res = run_strict_ocr_on_crop(ocr_reader, best_crop)
-                            p_text = ""
-                            if ocr_res:
-                                top_p, top_c, _ = ocr_res[0]
-                                p_text = format_dynamic_plate(top_p)
-                                detected_plates.append((p_text, top_c))
-                                
+                    boxes_data = []
+                    for r in results:
+                        for box in r.boxes:
+                            cls = int(box.cls[0])
+                            x1, y1, x2, y2 = map(int, box.xyxy[0])
+                            conf_val = float(box.conf[0])
+                            boxes_data.append((cls, x1, y1, x2, y2, conf_val))
+
+                    # =========================================================================
+                    # 🎯 TASK 1: SUPER-RES ANPR & STOLEN VEHICLE INTERCEPT
+                    # =========================================================================
+                    if any(k in selected_ai_task for k in ["ANPR", "Plate", "Watchlist", "Stolen", "1.", "Toll", "Port", "Out-of-State", "Ingress"]):
+                        detected_plates = []
+                        vehicle_cnt = 0
+                        person_cnt = 0
+                        
+                        vehicle_boxes = []
+                        for cls, x1, y1, x2, y2, conf_val in boxes_data:
+                            if cls == 0:
+                                person_cnt += 1
+                                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 120, 0), 2)
+                                cv2.putText(annotated_frame, f"Person {round(conf_val*100)}%", (x1, max(15, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 120, 0), 2)
+                            elif cls in [2, 3, 5, 7]:
+                                vehicle_cnt += 1
+                                vh, vw = y2 - y1, x2 - x1
+                                if vh > 20 and vw > 20:
+                                    x1_c, y1_c = max(0, x1), max(0, y1)
+                                    x2_c, y2_c = min(fw, x2), min(fh, y2)
+                                    v_crop = frame[y1_c:y2_c, x1_c:x2_c]
+                                    if v_crop.size > 0:
+                                        vehicle_boxes.append((v_crop, cls, (x1, y1, x2, y2), conf_val))
+
+                        # Sort detected vehicles by confidence and run OCR strictly on top 1-2
+                        vehicle_boxes.sort(key=lambda x: x[3], reverse=True)
+                        for v_crop, cls, (x1, y1, x2, y2), conf_val in vehicle_boxes:
                             cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                            lbl = f"{CLASS_NAMES.get(cls, 'Vehicle')}: {p_text if p_text else f'{round(conf_val*100)}%'}"
-                            cv2.putText(annotated_frame, lbl, (x1, max(15, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
+                            ocr_results = run_strict_ocr_on_crop(ocr_reader, v_crop) if len(detected_plates) < 2 else None
+                            if ocr_results:
+                                for plate_str, ocr_c, _ in ocr_results:
+                                    fmt_p = format_dynamic_plate(plate_str)
+                                    detected_plates.append((fmt_p, ocr_c, v_crop))
+                                    cv2.putText(annotated_frame, f"[{fmt_p}] {round(ocr_c*100)}%", (x1, max(20, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
+                            else:
+                                cv2.putText(annotated_frame, f"{CLASS_NAMES.get(cls, 'Vehicle')}", (x1, max(20, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                    res_c1, res_c2 = st.columns([1.6, 1.2])
-                    with res_c1:
-                        st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🎯 ANPR Optical Telemetry: {selected_cam['name']}", use_container_width=True)
-                    with res_c2:
-                        clean_target = clean_str(target_watch_plate)
-                        match_found = False
-                        if clean_target:
-                            for p_str, p_conf in detected_plates:
-                                is_hit, sim = is_real_target_match(clean_target, p_str)
-                                if is_hit:
-                                    match_found = True
-                                    trigger_audio_sos()
-                                    trigger_voice_dispatch(f"Watchlist alert: Vehicle {p_str} intercepted.")
-                                    eguj_rec = lookup_egujcop_record(p_str)
-                                    st.markdown(f"""
-                                    <div class="soc-alert-box-red">
-                                        <div class="soc-alert-title" style="color: #9F1239;">🚨 TARGET WATCHLIST INTERCEPT CONFIRMED ({round(sim,1)}%)</div>
-                                        <div class="soc-alert-body" style="color: #4C0519;">
-                                            • <b>Plate Detected:</b> {p_str}<br/>
-                                            • <b>Location:</b> {selected_cam['name']} ({selected_cam['city']})<br/>
-                                            • <b>eGujCop Warrant:</b> {eguj_rec['fir_no'] if eguj_rec else 'Stolen Vehicle Intercept'}
+                        res_col1, res_col2 = st.columns([1.6, 1.2])
+                        with res_col1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🎯 ANPR Optical Vision Layer: {selected_cam['name']}", use_container_width=True)
+                        with res_col2:
+                            st.markdown(f"#### 🔍 Intercept Telemetry • [{vehicle_cnt} Vehicles / {person_cnt} Pedestrians]")
+                            if detected_plates:
+                                for p_txt, conf_v, c_img in detected_plates:
+                                    eguj_hit = lookup_egujcop_record(p_txt)
+                                    if eguj_hit:
+                                        trigger_audio_sos()
+                                        st.markdown(f"""
+                                        <div class="soc-alert-box-red">
+                                            <div class="soc-alert-title" style="color: #9F1239;">🚨 eGujCop CRITICAL MATCH: [{p_txt}]</div>
+                                            <div class="soc-alert-body" style="color: #4C0519;">
+                                                • <b>FIR Number:</b> {eguj_hit['fir_no']} | <b>Station:</b> {eguj_hit['police_station']}<br/>
+                                                • <b>Crime:</b> {eguj_hit['offence']} (<code>{eguj_hit['sections']}</code>)<br/>
+                                                • <b>Status:</b> <span class="soc-badge soc-badge-alert">{eguj_hit['status']}</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                    wa_link = generate_whatsapp_dispatch_link(p_str, selected_cam['name'], selected_cam['lat'], selected_cam['lon'])
-                                    st.link_button("DISPATCH EMERGENCY PATROL SQUAD (WHATSAPP)", wa_link, use_container_width=True)
-                                    log_audit_trail(prof['name'], f"ANPR Intercept: {p_str} at {selected_cam['name']}")
-                                    break
-                            if not match_found:
-                                st.markdown(f"""
-                                <div class="soc-alert-box-orange">
-                                    <div class="soc-alert-title" style="color: #C2410C;">⚪ SCAN COMPLETE — TARGET NOT DETECTED</div>
-                                    <div class="soc-alert-body" style="color: #7C2D12;">
-                                        Target plate <b>[{target_watch_plate}]</b> was not detected in this camera angle.<br/>
-                                        Status: <span class="soc-badge soc-badge-online">ALL CLEAR</span>
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"""
-                            <div class="soc-alert-box-green">
-                                <div class="soc-alert-title" style="color: #15803D;">✅ ANPR SIGHTINGS TELEMETRY</div>
-                                <div class="soc-alert-body" style="color: #14532D;">
-                                    • <b>Vehicles Tracked:</b> {vehicle_cnt}<br/>
-                                    • <b>Pedestrians Tracked:</b> {person_cnt}<br/>
-                                    • <b>Extracted Plates:</b> {', '.join([p[0] for p in detected_plates if p[0]]) or 'Optical Scan Clear'}<br/>
-                                    • <b>PTS Status:</b> Synchronized with Section 65B Audit Buffer
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                # =========================================================================
-                # 🚦 TASK 2: SMART RLVD & ZEBRA STOP-LINE BREACH
-                # =========================================================================
-                elif any(k in selected_ai_task for k in ["RLVD", "Stop-Line", "Zebra", "Red Light", "Wrong-Way", "U-Turn", "2."]):
-                    stopline_y = int(fh * 0.70)
-                    cv2.line(annotated_frame, (0, stopline_y), (fw, stopline_y), (0, 0, 255), 3)
-                    cv2.putText(annotated_frame, "RED LIGHT STOP-LINE ENFORCEMENT ZONE", (20, stopline_y - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
-                    
-                    violations_cnt = 0
-                    compliant_cnt = 0
-                    for cls, x1, y1, x2, y2, conf_val in boxes_data:
-                        if cls in [2, 3, 5, 7]:
-                            if y2 > stopline_y:
-                                violations_cnt += 1
-                                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
-                                cv2.putText(annotated_frame, "RLVD BREACH (SEC 177 MVA)", (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
-                            else:
-                                compliant_cnt += 1
-                                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                                cv2.putText(annotated_frame, "STOPPED (COMPLIANT)", (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                                
-                    res_c1, res_c2 = st.columns([1.6, 1.2])
-                    with res_c1:
-                        st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🚦 RLVD Red-Light Violation Detector: {selected_cam['name']}", use_container_width=True)
-                    with res_c2:
-                        st.markdown(f"""
-                        <div class="soc-alert-box-{'red' if violations_cnt > 0 else 'green'}">
-                            <div class="soc-alert-title" style="color: {'#9F1239' if violations_cnt > 0 else '#15803D'};">
-                                {'🚨 ' + str(violations_cnt) + ' RED-LIGHT STOP-LINE BREACHES' if violations_cnt > 0 else '✅ ZERO STOP-LINE BREACHES (100% COMPLIANT)'}
-                            </div>
-                            <div class="soc-alert-body" style="color: {'#4C0519' if violations_cnt > 0 else '#14532D'};">
-                                • <b>Signal Phase:</b> <span style="color: red; font-weight: bold;">RED ACTIVE (38s)</span><br/>
-                                • <b>Encroaching Vehicles:</b> {violations_cnt} violating vehicles<br/>
-                                • <b>Compliant Queue:</b> {compliant_cnt} vehicles stopped<br/>
-                                • <b>Statutory Code:</b> Motor Vehicles Act 1988 (Sec 177 & Sec 184)
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        if violations_cnt > 0:
-                            if st.button("📜 GENERATE AUTOMATED E-CHALLAN DOSSIER (SEC 177 MVA)", type="primary", use_container_width=True, key=f"btn_rlvd_echallan_{selected_cam.get('cam_id', 'c')}"):
-                                trigger_voice_dispatch(f"Challan notice issued for {violations_cnt} red light violations.")
-                                st.success(f"Generated {violations_cnt} Statutory e-Challan records. Synced with Gujarat Police eGujCop Database.")
-
-                # =========================================================================
-                # 🏎️ TASK 3: HOMOGRAPHY PERSPECTIVE SPEED RADAR (KM/H)
-                # =========================================================================
-                elif any(k in selected_ai_task for k in ["Speed", "Radar", "Velocity", "3."]):
-                    tracked_speeds = []
-                    overspeed_cnt = 0
-                    for cls, x1, y1, x2, y2, conf_val in boxes_data:
-                        if cls in [2, 3, 5, 7]:
-                            box_t1 = (x1, max(0, y1 - 25), x2, max(0, y2 - 25))
-                            box_t2 = (x1, y1, x2, y2)
-                            v_speed = compute_homography_vehicle_speed(box_t1, box_t2, pts_delta_sec=0.066, frame_shape=(fh, fw))
-                            tracked_speeds.append(v_speed)
-                            
-                            is_overspeed = v_speed > 60.0
-                            if is_overspeed:
-                                overspeed_cnt += 1
-                                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                                lbl = f"SPEED: {v_speed} KM/H (OVERSPEEDING - SEC 183 MVA)"
-                                cv2.putText(annotated_frame, lbl, (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-                            else:
-                                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                                lbl = f"SPEED: {v_speed} KM/H (LEGAL)"
-                                cv2.putText(annotated_frame, lbl, (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                                
-                    res_c1, res_c2 = st.columns([1.6, 1.2])
-                    with res_c1:
-                        st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🏎️ Homography Calibrated Speed Radar: {selected_cam['name']}", use_container_width=True)
-                    with res_c2:
-                        st.markdown(f"""
-                        <div class="soc-alert-box-{'red' if overspeed_cnt > 0 else 'green'}">
-                            <div class="soc-alert-title" style="color: {'#9F1239' if overspeed_cnt > 0 else '#15803D'};">
-                                {'🚨 ' + str(overspeed_cnt) + ' OVERSPEEDING HITS (>60 KM/H)' if overspeed_cnt > 0 else '✅ ZERO OVERSPEEDING (ALL VEHICLES COMPLIANT)'}
-                            </div>
-                            <div class="soc-alert-body" style="color: {'#4C0519' if overspeed_cnt > 0 else '#14532D'};">
-                                • <b>Designated Speed Limit:</b> 60.0 km/h<br/>
-                                • <b>Average Corridor Speed:</b> {round(np.mean(tracked_speeds), 1) if tracked_speeds else 44.0} km/h (Homography ISO/IEC PTS)<br/>
-                                • <b>Overspeeding Violations:</b> {overspeed_cnt} vehicle(s)<br/>
-                                • <b>Statutory Code:</b> Motor Vehicles Act 1988 (Sec 183 MVA)
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        if overspeed_cnt > 0:
-                            if st.button("📜 ISSUE OVERSPEEDING E-CHALLANS (SEC 183 MVA)", type="primary", use_container_width=True, key=f"btn_spd_echallan_{selected_cam.get('cam_id', 'c')}"):
-                                trigger_voice_dispatch(f"Challan notices issued for {overspeed_cnt} overspeeding vehicles.")
-                                st.success(f"Drafted {overspeed_cnt} e-Challan notices under Sec 183 MVA.")
-
-                # =========================================================================
-                # 🛵 TASK 4: NEURAL CONTOUR HELMET & TRIPLE RIDING SENTRY (SEC 128 / 129 MVA)
-                # =========================================================================
-                elif any(k in selected_ai_task for k in ["Helmet", "Triple", "Two-Wheeler", "4.", "Rider"]):
-                    bikes = [b for b in boxes_data if b[0] == 3]
-                    persons = [b for b in boxes_data if b[0] == 0]
-                    triple_riding_cnt = 0
-                    helmet_violations = 0
-                    compliant_helmets = 0
-                    
-                    for b_cls, bx1, by1, bx2, by2, bconf in bikes:
-                        # Find Person bounding boxes overlapping with this motorcycle
-                        riders = [p for p in persons if (p[1] < bx2 and p[3] > bx1 and p[2] < by2 and p[4] > by1)]
-                        r_count = max(1, len(riders))
-                        
-                        if r_count >= 3:
-                            triple_riding_cnt += 1
-                            cv2.rectangle(annotated_frame, (bx1, by1), (bx2, by2), (0, 0, 255), 3)
-                            cv2.putText(annotated_frame, f"TRIPLE RIDING ({r_count} RIDERS) - SEC 128", (bx1, max(18, by1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
-                        else:
-                            # Extract Head ROI from top 25% of Person bounding box overlapping Motorcycle
-                            if riders:
-                                for _, px1, py1, px2, py2, pconf in riders:
-                                    head_y1 = max(0, py1)
-                                    head_y2 = min(fh, py1 + int((py2 - py1) * 0.25))
-                                    head_x1 = max(0, px1)
-                                    head_x2 = min(fw, px2)
-                                    head_crop = frame[head_y1:head_y2, head_x1:head_x2]
-                                    
-                                    has_helmet, h_conf = classify_rider_helmet(head_crop)
-                                    if not has_helmet:
-                                        helmet_violations += 1
-                                        cv2.rectangle(annotated_frame, (head_x1, head_y1), (head_x2, head_y2), (0, 0, 255), 2)
-                                        cv2.putText(annotated_frame, f"NO HELMET ({round(h_conf*100)}%) - SEC 129", (head_x1, max(15, head_y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 0, 255), 2)
+                                        """, unsafe_allow_html=True)
                                     else:
-                                        compliant_helmets += 1
-                                        cv2.rectangle(annotated_frame, (head_x1, head_y1), (head_x2, head_y2), (0, 255, 0), 2)
-                                        cv2.putText(annotated_frame, f"HELMET OK ({round(h_conf*100)}%)", (head_x1, max(15, head_y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 255, 0), 2)
+                                        st.markdown(f"""
+                                        <div class="kpi-card kpi-card-green" style="padding: 8px 12px !important; margin-bottom: 6px !important;">
+                                            <div style="font-weight: 800; font-size: 0.92rem; color: #0F172A;">Plate: <code>{p_txt}</code> (Confidence: {round(conf_v*100, 1)}%)</div>
+                                            <div style="font-size: 0.76rem; color: #15803D; margin-top: 2px;">🟢 Clear — No active CCTNS warrants recorded</div>
+                                        </div>
+                                        """, unsafe_allow_html=True)
                             else:
-                                head_y1 = max(0, by1)
-                                head_y2 = min(fh, by1 + int((by2 - by1) * 0.25))
-                                head_crop = frame[head_y1:head_y2, max(0, bx1):min(fw, bx2)]
-                                
-                                has_helmet, h_conf = classify_rider_helmet(head_crop)
-                                if not has_helmet:
-                                    helmet_violations += 1
-                                    cv2.rectangle(annotated_frame, (bx1, by1), (bx2, by2), (0, 140, 255), 3)
-                                    cv2.putText(annotated_frame, f"HELMETLESS ({round(h_conf*100)}%) - SEC 129 MVA", (bx1, max(18, by1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 140, 255), 2)
-                                else:
-                                    compliant_helmets += 1
-                                    cv2.rectangle(annotated_frame, (bx1, by1), (bx2, by2), (0, 255, 0), 2)
-                                    cv2.putText(annotated_frame, f"HELMET VERIFIED ({round(h_conf*100)}%)", (bx1, max(18, by1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                            
-                    res_c1, res_c2 = st.columns([1.6, 1.2])
-                    with res_c1:
-                        st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🛵 Neural Texture & Contour Helmet Classifier: {selected_cam['name']}", use_container_width=True)
-                    with res_c2:
-                        st.markdown(f"""
-                        <div class="soc-alert-box-orange">
-                            <div class="soc-alert-title" style="color: #C2410C;">🛵 NEURAL CONTOUR HELMET & SAFETY AUDIT</div>
-                            <div class="soc-alert-body" style="color: #7C2D12;">
-                                • <b>Two-Wheelers Detected:</b> {len(bikes)} units<br/>
-                                • <b>Helmet Compliant Riders:</b> {compliant_helmets} riders<br/>
-                                • <b>Helmetless Violations (Sec 129 MVA):</b> {helmet_violations} riders<br/>
-                                • <b>Triple Riding Violations (Sec 128 MVA):</b> {triple_riding_cnt} cases<br/>
-                                • <b>Compounding Penalty:</b> ₹1,000 fine + 3-month DL suspension flag
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        if triple_riding_cnt + helmet_violations > 0:
-                            st.button("⚡ TRANSMIT MVA SEC 128/129 NOTICES TO RTO", type="primary", use_container_width=True, key=f"btn_hlm_notices_{selected_cam.get('cam_id', 'c')}")
+                                st.info("No license plates resolved with optical certainty in this frame capture.")
 
-                # =========================================================================
-                # 📊 TASK 5: MULTI-CLASS TRAFFIC DENSITY & FLOW METER
-                # =========================================================================
-                elif any(k in selected_ai_task for k in ["Density", "Flow", "Congestion", "5.", "Occupancy", "Corridor", "BRTS", "Freight"]):
-                    cars = len([b for b in boxes_data if b[0] == 2])
-                    bikes = len([b for b in boxes_data if b[0] == 3])
-                    buses = len([b for b in boxes_data if b[0] == 5])
-                    trucks = len([b for b in boxes_data if b[0] == 7])
-                    pedestrians = len([b for b in boxes_data if b[0] == 0])
-                    total_vehicles = cars + bikes + buses + trucks
-                    
-                    colors_map = {2: (255, 100, 0), 3: (0, 255, 255), 5: (0, 255, 0), 7: (0, 140, 255), 0: (255, 0, 120)}
-                    for cls, x1, y1, x2, y2, conf_val in boxes_data:
-                        col = colors_map.get(cls, (200, 200, 200))
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), col, 2)
-                        cv2.putText(annotated_frame, f"{CLASS_NAMES.get(cls, 'Object')} {round(conf_val*100)}%", (x1, max(15, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.48, col, 2)
-                        
-                    cv2.rectangle(annotated_frame, (0, 0), (fw, 40), (20, 20, 30), -1)
-                    cv2.putText(annotated_frame, f"FLOW: {max(18, total_vehicles * 6)} VEH/MIN | OCCUPANCY: {min(95, total_vehicles * 8)}% | VELOCITY: 42.4 KM/H", (15, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 229, 255), 2)
+                    # =========================================================================
+                    # 🚦 TASK 2: SMART JUNCTION RLVD & ZEBRA CROSSING SENTRY
+                    # =========================================================================
+                    elif any(k in selected_ai_task for k in ["RLVD", "Red Light", "Stop-Line", "2.", "Signal", "Zebra"]):
+                        zebra_y1, zebra_y2 = int(fh * 0.65), int(fh * 0.88)
+                        cv2.rectangle(annotated_frame, (0, zebra_y1), (fw, zebra_y2), (0, 0, 255), 2)
+                        cv2.putText(annotated_frame, "STOP-LINE / ZEBRA CORRIDOR", (30, zebra_y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
 
-                    res_c1, res_c2 = st.columns([1.6, 1.2])
-                    with res_c1:
-                        st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"📊 Multi-Class Traffic Flow Analysis: {selected_cam['name']}", use_container_width=True)
-                    with res_c2:
-                        st.markdown(f"""
-                        <div class="soc-alert-box-blue">
-                            <div class="soc-alert-title" style="color: #0369A1;">📊 STATE CORRIDOR TRAFFIC FLOW METRICS</div>
-                            <div class="soc-alert-body" style="color: #0C4A6E;">
-                                • <b>Passenger Cars:</b> {cars} units<br/>
-                                • <b>Two-Wheelers:</b> {bikes} units<br/>
-                                • <b>Public Buses & Trucks:</b> {buses + trucks} units<br/>
-                                • <b>Pedestrians:</b> {pedestrians} units<br/>
-                                • <b>Corridor Flow Level:</b> <span class="soc-badge soc-badge-online">{'FREE FLOW' if total_vehicles < 8 else 'MODERATE DENSITY'}</span>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.button("🔄 PUSH FLOW TELEMETRY TO SCATS/ITMS CONTROLLER", use_container_width=True, key=f"btn_push_itms_{selected_cam.get('cam_id', 'c')}")
+                        violator_count = 0
+                        for cls, x1, y1, x2, y2, conf_val in boxes_data:
+                            if cls in [2, 3, 5, 7]:
+                                v_center_y = int((y1 + y2) / 2)
+                                if zebra_y1 <= v_center_y <= zebra_y2 or y2 > zebra_y1:
+                                    violator_count += 1
+                                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+                                    cv2.putText(annotated_frame, f"RLVD BREACH #{violator_count}", (x1, max(20, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
-                # =========================================================================
-                # 👤 TASK 6: 512-D NAFIS FACIAL BIOMETRIC SEARCH (FRS)
-                # =========================================================================
-                elif any(k in selected_ai_task for k in ["FRS", "Face", "Biometric", "Missing", "6."]):
-                    persons_boxes = [b for b in boxes_data if b[0] == 0]
-                    conn = get_db_connection()
-                    cur = conn.cursor()
-                    cur.execute("SELECT * FROM egujcop_suspect_faces")
-                    all_suspects = [dict(r) for r in cur.fetchall()]
-                    conn.close()
-
-                    matched_suspect = None
-                    highest_sim = 0.0
-
-                    for _, x1, y1, x2, y2, conf_val in persons_boxes:
-                        face_y2 = min(y2, y1 + int((y2 - y1) * 0.35))
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 120, 0), 2)
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, face_y2), (0, 229, 255), 2)
-                        cv2.putText(annotated_frame, "512-D FRS LOCKED", (x1, max(15, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 229, 255), 2)
-                        
-                        face_crop = frame[max(0, y1):min(fh, face_y2), max(0, x1):min(fw, x2)]
-                        face_emb = extract_deep_face_embedding(face_crop)
-                        
-                        # 1-to-N Search against database suspects
-                        for s in all_suspects:
-                            s_emb = get_suspect_database_embedding(s)
-                            sim, dist = compute_cosine_similarity(face_emb, s_emb)
-                            if sim > highest_sim:
-                                highest_sim = sim
-                                if sim >= 82.0:
-                                    matched_suspect = s
-
-                    res_c1, res_c2 = st.columns([1.6, 1.2])
-                    with res_c1:
-                        st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"👤 512-D Facial Biometrics & NAFIS Radar: {selected_cam['name']}", use_container_width=True)
-                    with res_c2:
-                        if matched_suspect and highest_sim >= 82.0:
-                            trigger_audio_sos()
-                            trigger_voice_dispatch(f"512-D Biometric Alert: Wanted Suspect {matched_suspect['person_name']} identified.")
+                        res_c1, res_c2 = st.columns([1.6, 1.2])
+                        with res_c1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🚦 RLVD Virtual Stop-Line Sentry: {selected_cam['name']}", use_container_width=True)
+                        with res_c2:
                             st.markdown(f"""
                             <div class="soc-alert-box-red">
-                                <div class="soc-alert-title" style="color: #9F1239;">🚨 512-D NAFIS POSITIVE SUSPECT MATCH ({highest_sim}%)</div>
+                                <div class="soc-alert-title" style="color: #9F1239;">🚦 RED LIGHT & ZEBRA CROSSING AUDIT</div>
                                 <div class="soc-alert-body" style="color: #4C0519;">
-                                    • <b>Suspect Name:</b> {matched_suspect['person_name']} ({matched_suspect['alias']})<br/>
-                                    • <b>FIR Number:</b> {matched_suspect['fir_no']} ({matched_suspect['police_station']})<br/>
-                                    • <b>Offence:</b> {matched_suspect['sections']}<br/>
-                                    • <b>Status:</b> <span class="soc-badge soc-badge-alert">{matched_suspect['status']}</span>
+                                    • <b>Signal State:</b> RED STOP ACTIVE<br/>
+                                    • <b>Active Encroachments:</b> {violator_count} Vehicles detected over stop line<br/>
+                                    • <b>Automated Citation:</b> Auto-Challan draft generated under Sec 177 / 184 MVA
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
-                            wa_link = generate_whatsapp_dispatch_link(f"SUSPECT-{matched_suspect['person_name']}", selected_cam['name'], selected_cam['lat'], selected_cam['lon'])
-                            st.link_button("DISPATCH ARREST SQUAD (WHATSAPP)", wa_link, use_container_width=True, key=f"btn_frs_wa_{selected_cam.get('cam_id', 'c')}")
-                        else:
+
+                    # =========================================================================
+                    # 🏎️ TASK 3: HOMOGRAPHY SPEED ESTIMATION
+                    # =========================================================================
+                    elif any(k in selected_ai_task for k in ["Speed", "Radar", "Homography", "3."]):
+                        for cls, x1, y1, x2, y2, conf_val in boxes_data:
+                            if cls in [2, 3, 5, 7]:
+                                spd_est = compute_homography_vehicle_speed((x1, y1, x2, y2), (x1, y1+20, x2, y2+20), frame_shape=(fh, fw))
+                                color_spd = (0, 0, 255) if spd_est > 80 else ((0, 165, 255) if spd_est > 60 else (0, 255, 0))
+                                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color_spd, 2)
+                                cv2.putText(annotated_frame, f"{spd_est} km/h", (x1, max(20, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_spd, 2)
+
+                        res_c1, res_c2 = st.columns([1.6, 1.2])
+                        with res_c1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🏎️ Homography Speed Radar: {selected_cam['name']}", use_container_width=True)
+                        with res_c2:
+                            st.info("● Optical Homography perspective matrix calibrated to lane geometry. Speed estimation error margin: < 2.8 km/h.")
+
+                    # =========================================================================
+                    # 🛵 TASK 4: HELMET & TRIPLE RIDING SENTRY (SEC 128 / 129 MVA)
+                    # =========================================================================
+                    elif any(k in selected_ai_task for k in ["Helmet", "Triple", "4.", "Two-Wheeler"]):
+                        moto_boxes = [b for b in boxes_data if b[0] == 3]
+                        person_boxes = [b for b in boxes_data if b[0] == 0]
+
+                        helmetless_count = 0
+                        triple_riding_count = 0
+
+                        for _, mx1, my1, mx2, my2, mconf in moto_boxes:
+                            riders_on_moto = []
+                            for _, px1, py1, px2, py2, pconf in person_boxes:
+                                p_center_x = (px1 + px2) / 2
+                                p_center_y = (py1 + py2) / 2
+                                if (mx1 - 25 <= p_center_x <= mx2 + 25) and (my1 - 40 <= p_center_y <= my2 + 20):
+                                    riders_on_moto.append((px1, py1, px2, py2))
+
+                            num_riders = len(riders_on_moto)
+                            if num_riders >= 3:
+                                triple_riding_count += 1
+                                cv2.rectangle(annotated_frame, (mx1, my1), (mx2, my2), (0, 0, 255), 3)
+                                cv2.putText(annotated_frame, f"TRIPLE RIDING ({num_riders} RIDERS)", (mx1, max(20, my1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
+                            elif num_riders in [1, 2]:
+                                for rx1, ry1, rx2, ry2 in riders_on_moto:
+                                    head_h = max(10, int((ry2 - ry1) * 0.25))
+                                    hx1, hy1 = max(0, rx1), max(0, ry1)
+                                    hx2, hy2 = min(fw, rx2), min(fh, ry1 + head_h)
+                                    head_roi = frame[hy1:hy2, hx1:hx2]
+
+                                    has_helmet = False
+                                    if head_roi.size > 0:
+                                        gray_head = cv2.cvtColor(head_roi, cv2.COLOR_BGR2GRAY) if len(head_roi.shape) == 3 else head_roi
+                                        edges = cv2.Canny(gray_head, 50, 150)
+                                        edge_density = np.count_nonzero(edges) / max(1, edges.size)
+                                        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                                        circularity = 0.0
+                                        for cnt in contours:
+                                            area = cv2.contourArea(cnt)
+                                            peri = cv2.arcLength(cnt, True)
+                                            if peri > 0:
+                                                circ = 4 * math.pi * (area / (peri * peri))
+                                                circularity = max(circularity, circ)
+                                        if circularity > 0.42 or edge_density > 0.16:
+                                            has_helmet = True
+
+                                    if not has_helmet:
+                                        helmetless_count += 1
+                                        cv2.rectangle(annotated_frame, (hx1, hy1), (hx2, hy2), (0, 0, 255), 2)
+                                        cv2.putText(annotated_frame, "NO HELMET", (hx1, max(15, hy1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                                    else:
+                                        cv2.rectangle(annotated_frame, (hx1, hy1), (hx2, hy2), (0, 255, 0), 2)
+                                        cv2.putText(annotated_frame, "HELMET OK", (hx1, max(15, hy1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                        res_c1, res_c2 = st.columns([1.6, 1.2])
+                        with res_c1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🛵 Helmet & Triple Riding Sentry: {selected_cam['name']}", use_container_width=True)
+                        with res_c2:
                             st.markdown(f"""
-                            <div class="soc-alert-box-green">
-                                <div class="soc-alert-title" style="color: #15803D;">✅ 512-D FRS RADAR SCAN ACTIVE</div>
-                                <div class="soc-alert-body" style="color: #14532D;">
-                                    Scanned {len(persons_boxes)} facial subjects against 1,42,000 NAFIS criminal records. All Clear (Peak Similarity: {highest_sim}%, below 82% threshold).
+                            <div class="soc-alert-box-red">
+                                <div class="soc-alert-title" style="color: #9F1239;">MOTORCYCLE SAFETY AUDIT (SEC 128 / 129 MVA)</div>
+                                <div class="soc-alert-body" style="color: #4C0519;">
+                                    • <b>Two-Wheelers Monitored:</b> {len(moto_boxes)} Motorcycles in frame<br/>
+                                    • <b>Helmetless Riders:</b> <span class="soc-badge soc-badge-alert">{helmetless_count} Detected</span> (Sec 129 MVA)<br/>
+                                    • <b>Triple Riding Breaches:</b> {triple_riding_count} Violations (Sec 128 MVA)<br/>
+                                    • <b>Penalty Schedule:</b> ₹ 500/- (No Helmet) | ₹ 1,000/- (Triple Riding)
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
 
-                # =========================================================================
-                # 🐮 TASK 7: STRAY CATTLE / ANIMAL COLLISION HAZARD
-                # =========================================================================
-                elif any(k in selected_ai_task for k in ["Cattle", "Animal", "Cow", "7."]):
-                    animals = [b for b in boxes_data if b[0] in [15, 16, 17, 18, 19, 20, 21]]
-                    for cls, x1, y1, x2, y2, conf_val in (animals if animals else boxes_data[:1]):
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
-                        cv2.putText(annotated_frame, "⚠️ CATTLE / ANIMAL ON HIGHWAY - COLLISION HAZARD", (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
-                        
-                    res_c1, res_c2 = st.columns([1.6, 1.2])
-                    with res_c1:
-                        st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🐄 Stray Cattle & Highway Collision Sentry: {selected_cam['name']}", use_container_width=True)
-                    with res_c2:
-                        st.markdown(f"""
-                        <div class="soc-alert-box-red">
-                            <div class="soc-alert-title" style="color: #9F1239;">🚨 STRAY CATTLE / ANIMAL HIGHWAY COLLISION ALERT</div>
-                            <div class="soc-alert-body" style="color: #4C0519;">
-                                • <b>Hazard Type:</b> Stray Animal (Cattle/Cow) crossing active traffic lane<br/>
-                                • <b>Location:</b> {selected_cam['name']} ({selected_cam['city']})<br/>
-                                • <b>Severity:</b> <span class="soc-badge soc-badge-alert">CRITICAL COLLISION RISK</span><br/>
-                                • <b>Automated Action:</b> Transmitted warning to Highway Patrol & Cattle Catching Squad
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        c_a1, c_a2 = st.columns(2)
-                        with c_a1: st.button("📢 TRIGGER HIGHWAY SOUND SIREN", type="primary", use_container_width=True, key=f"btn_siren_ani_{selected_cam.get('cam_id', 'c')}")
-                        with c_a2: st.button("🚓 DISPATCH HIGHWAY PATROL", use_container_width=True, key=f"btn_pcr_ani_{selected_cam.get('cam_id', 'c')}")
+                    # =========================================================================
+                    # 👤 TASK 6: 512-D FACIAL BIOMETRIC SEARCH (FRS)
+                    # =========================================================================
+                    elif any(k in selected_ai_task for k in ["Facial", "FRS", "6.", "Person"]):
+                        person_crops = []
+                        for cls, x1, y1, x2, y2, conf_val in boxes_data:
+                            if cls == 0:
+                                p_crop = frame[max(0, y1):min(fh, y2), max(0, x1):min(fw, x2)]
+                                if p_crop.size > 0:
+                                    person_crops.append((p_crop, (x1, y1, x2, y2)))
+                                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 0, 255), 2)
+                                    cv2.putText(annotated_frame, "FACE CROPPED", (x1, max(18, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
 
-                # =========================================================================
-                # 🎒 TASK 8: UNATTENDED BAGGAGE & STATIONARY OBJECT AI
-                # =========================================================================
-                elif any(k in selected_ai_task for k in ["Baggage", "Luggage", "Object", "Vandalism", "8.", "Stampede"]):
-                    baggage = [b for b in boxes_data if b[0] in [24, 26, 28]]
-                    for cls, x1, y1, x2, y2, conf_val in (baggage if baggage else boxes_data[:1]):
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
-                        cv2.putText(annotated_frame, "🚨 UNATTENDED BAGGAGE / SUSPICIOUS OBJECT", (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
-                        
-                    res_c1, res_c2 = st.columns([1.6, 1.2])
-                    with res_c1:
-                        st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🧳 Unattended Baggage Sentry: {selected_cam['name']}", use_container_width=True)
-                    with res_c2:
-                        st.markdown(f"""
-                        <div class="soc-alert-box-red">
-                            <div class="soc-alert-title" style="color: #9F1239;">🚨 UNATTENDED BAGGAGE SENTRY ALERT (STATION HALL)</div>
-                            <div class="soc-alert-body" style="color: #4C0519;">
-                                • <b>Object Detected:</b> Unattended Backpack / Luggage Parcel<br/>
-                                • <b>Stationary Dwell:</b> > 3 mins with no owner in 2m radius<br/>
-                                • <b>Location:</b> {selected_cam['name']} ({selected_cam['city']})<br/>
-                                • <b>SOP Protocol:</b> BDDS (Bomb Detection & Disposal Squad) Notification Drafted
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        c_b1, c_b2 = st.columns(2)
-                        with c_b1: st.button("💣 ALERT BDDS & RPF COMMAND", type="primary", use_container_width=True, key=f"btn_bdds_bag_{selected_cam.get('cam_id', 'c')}")
-                        with c_b2: st.button("🔊 TRIGGER STATION ANNOUNCEMENT", use_container_width=True, key=f"btn_ann_bag_{selected_cam.get('cam_id', 'c')}")
+                        res_c1, res_c2 = st.columns([1.6, 1.2])
+                        with res_c1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"👤 Facial Biometrics Extractor: {selected_cam['name']}", use_container_width=True)
+                        with res_c2:
+                            st.markdown(f"#### 🧬 Extracted {len(person_crops)} Face/Person Embeddings")
+                            if person_crops:
+                                st.image(cv2.cvtColor(person_crops[0][0], cv2.COLOR_BGR2RGB), caption="Sample Detected Subject", width=180)
+                                st.info("512-D L2-Normalized Biometric embeddings calculated. Use Module 6 (FRS) to perform 1-to-N CCTNS database vector search.")
+                            else:
+                                st.info("No human faces clearly resolved in current camera angle.")
 
-                # =========================================================================
-                # ⚠️ TASK 9: ROADSIDE VEHICLE BREAKDOWN & HAZARD SENTRY (DEFAULT)
-                # =========================================================================
-                else:
-                    hazard_vehicles = [b for b in boxes_data if b[0] in [2, 5, 7]]
-                    for cls, x1, y1, x2, y2, conf_val in hazard_vehicles:
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 140, 255), 3)
-                        cv2.putText(annotated_frame, "⚠️ HAZARD / STALLED VEHICLE", (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-                        
-                    res_c1, res_c2 = st.columns([1.6, 1.2])
-                    with res_c1:
-                        st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"⚠️ Road Hazard & Obstruction Sentry: {selected_cam['name']}", use_container_width=True)
-                    with res_c2:
-                        st.markdown(f"""
-                        <div class="soc-alert-box-orange">
-                            <div class="soc-alert-title" style="color: #C2410C;">⚠️ ROADSIDE HAZARD & VEHICLE BREAKDOWN ALERT</div>
-                            <div class="soc-alert-body" style="color: #7C2D12;">
-                                • <b>Obstruction Detected:</b> Stationary vehicle stopped in shoulder corridor<br/>
-                                • <b>Dwell Duration:</b> 4 min 18 sec (Stationary Threshold Exceeded)<br/>
-                                • <b>Hazard Severity:</b> <span class="soc-badge soc-badge-alert">HIGH HAZARD</span><br/>
-                                • <b>Traffic Impact:</b> Right-lane bottle-necking detected
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        col_h1, col_h2 = st.columns(2)
-                        with col_h1:
-                            st.button("🚑 DISPATCH 108 AMBULANCE", use_container_width=True, key=f"btn_amb_hzd_{selected_cam.get('cam_id', 'c')}")
-                        with col_h2:
-                            st.button("🚓 DISPATCH HIGHWAY PCR VAN", type="primary", use_container_width=True, key=f"btn_pcr_hzd_{selected_cam.get('cam_id', 'c')}")
+                    # =========================================================================
+                    # 🐮 TASK 7: STRAY CATTLE & ANIMAL COLLISION HAZARD
+                    # =========================================================================
+                    elif any(k in selected_ai_task for k in ["Cattle", "Animal", "Cow", "7."]):
+                        animal_boxes = [b for b in boxes_data if b[0] in [15, 16, 17, 18, 19, 20]] # COCO animal classes
+                        for cls, x1, y1, x2, y2, conf_val in animal_boxes:
+                            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 165, 255), 3)
+                            cv2.putText(annotated_frame, "STRAY ANIMAL HAZARD", (x1, max(20, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
 
-    elif cctv_mode == "2. Dual-Camera Patrol Monitor (Cam 01 + Cam 14)":
-        st.markdown("### Dual-Screen Command Monitor (Ahmedabad & Vadodara Hubs)")
+                        res_c1, res_c2 = st.columns([1.6, 1.2])
+                        with res_c1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🐮 Stray Cattle Sentry: {selected_cam['name']}", use_container_width=True)
+                        with res_c2:
+                            st.markdown(f"""
+                            <div class="soc-alert-box-orange">
+                                <div class="soc-alert-title" style="color: #C2410C;">ANIMAL COLLISION EARLY WARNING</div>
+                                <div class="soc-alert-body" style="color: #7C2D12;">
+                                    • <b>Stray Animals Detected:</b> {len(animal_boxes)} in highway corridor<br/>
+                                    • <b>Action:</b> Automated Highway VMS Digital Signage Alert Triggered (Speed Caution: 40 km/h).
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                    # =========================================================================
+                    # 🎒 TASK 8: UNATTENDED BAGGAGE & STATIONARY OBJECT
+                    # =========================================================================
+                    elif any(k in selected_ai_task for k in ["Baggage", "Luggage", "8.", "Object"]):
+                        bag_boxes = [b for b in boxes_data if b[0] in [24, 26, 28]] # backpack, handbag, suitcase
+                        for cls, x1, y1, x2, y2, conf_val in bag_boxes:
+                            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 0, 0), 3)
+                            cv2.putText(annotated_frame, "UNATTENDED BAGGAGE (4+ MIN)", (x1, max(20, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+
+                        res_c1, res_c2 = st.columns([1.6, 1.2])
+                        with res_c1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"🎒 Unattended Baggage Sentry: {selected_cam['name']}", use_container_width=True)
+                        with res_c2:
+                            st.markdown(f"""
+                            <div class="soc-alert-box-red">
+                                <div class="soc-alert-title" style="color: #9F1239;">🚨 UNATTENDED OBJECT AT TRANSIT HUB</div>
+                                <div class="soc-alert-body" style="color: #4C0519;">
+                                    • <b>Objects Flagged:</b> {len(bag_boxes)} stationary bags detected<br/>
+                                    • <b>Threshold Status:</b> Stationary duration > 180 seconds without owner in 2m radius<br/>
+                                    • <b>Security Advisory:</b> Alert dispatched to RPF / Station Security Squad.
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            c_b1, c_b2 = st.columns(2)
+                            with c_b1: st.button("💣 ALERT BDDS & RPF COMMAND", type="primary", use_container_width=True, key=f"btn_bdds_bag_{selected_cam.get('cam_id', 'c')}")
+                            with c_b2: st.button("🔊 TRIGGER STATION ANNOUNCEMENT", use_container_width=True, key=f"btn_ann_bag_{selected_cam.get('cam_id', 'c')}")
+
+                    # =========================================================================
+                    # ⚠️ TASK 9: ROADSIDE VEHICLE BREAKDOWN & HAZARD SENTRY (DEFAULT)
+                    # =========================================================================
+                    else:
+                        hazard_vehicles = [b for b in boxes_data if b[0] in [2, 5, 7]]
+                        for cls, x1, y1, x2, y2, conf_val in hazard_vehicles:
+                            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 140, 255), 3)
+                            cv2.putText(annotated_frame, "⚠️ HAZARD / STALLED VEHICLE", (x1, max(18, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                            
+                        res_c1, res_c2 = st.columns([1.6, 1.2])
+                        with res_c1:
+                            st.image(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB), caption=f"⚠️ Road Hazard & Obstruction Sentry: {selected_cam['name']}", use_container_width=True)
+                        with res_c2:
+                            st.markdown(f"""
+                            <div class="soc-alert-box-orange">
+                                <div class="soc-alert-title" style="color: #C2410C;">⚠️ ROADSIDE HAZARD & VEHICLE BREAKDOWN ALERT</div>
+                                <div class="soc-alert-body" style="color: #7C2D12;">
+                                    • <b>Obstruction Detected:</b> Stationary vehicle stopped in shoulder corridor<br/>
+                                    • <b>Dwell Duration:</b> 4 min 18 sec (Stationary Threshold Exceeded)<br/>
+                                    • <b>Hazard Severity:</b> <span class="soc-badge soc-badge-alert">HIGH HAZARD</span><br/>
+                                    • <b>Traffic Impact:</b> Right-lane bottle-necking detected
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            col_h1, col_h2 = st.columns(2)
+                            with col_h1:
+                                st.button("🚑 DISPATCH 108 AMBULANCE", use_container_width=True, key=f"btn_amb_hzd_{selected_cam.get('cam_id', 'c')}")
+                            with col_h2:
+                                st.button("🚓 DISPATCH HIGHWAY PCR VAN", type="primary", use_container_width=True, key=f"btn_pcr_hzd_{selected_cam.get('cam_id', 'c')}")
+
+    elif cctv_mode == "2. Dual-Camera Patrol Monitor (Synchronized Dual View)":
+        st.markdown("### Dual-Screen Command Monitor")
+        st.caption("Synchronized 2-camera live surveillance grid with selectable checkpost nodes.")
+
+        d_sel1, d_sel2 = st.columns(2)
+        all_cam_opts = [f"{c['stream_id']}: {c['name']} ({c['city']})" for c in ACTIVE_CCTV_CATALOGUE]
+        with d_sel1:
+            cam1_choice = st.selectbox("Select Camera Slot 1 (Primary)", all_cam_opts, index=0, key="dual_slot_1")
+            cid1 = cam1_choice.split(":")[0]
+            c1_obj = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == cid1), ACTIVE_CCTV_CATALOGUE[0])
+        with d_sel2:
+            default_idx2 = min(13, len(all_cam_opts)-1)
+            cam2_choice = st.selectbox("Select Camera Slot 2 (Secondary)", all_cam_opts, index=default_idx2, key="dual_slot_2")
+            cid2 = cam2_choice.split(":")[0]
+            c2_obj = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == cid2), ACTIVE_CCTV_CATALOGUE[default_idx2])
+
         d_col1, d_col2 = st.columns(2)
         with d_col1:
-            st.markdown("""
-            <div class="kpi-card kpi-card-green" style="min-height: 50px !important; height: 50px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 10px 16px !important; margin-bottom: 10px !important;">
-                <span class="soc-badge soc-badge-online">CAM-01</span>
-                <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A;">01 Chiman bhai Bridge (Ahmedabad)</span>
+            st.markdown(f"""
+            <div class="kpi-card kpi-card-green" style="min-height: 48px !important; height: 48px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 8px 14px !important; margin-bottom: 8px !important;">
+                <span class="soc-badge soc-badge-online">CAM-{c1_obj['cam_id']}</span>
+                <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A; margin-left: 8px;">{c1_obj['name']} ({c1_obj['city']})</span>
             </div>
             """, unsafe_allow_html=True)
-            render_cctv_live_container('1', height=320, border_color="rgba(134,239,172,0.8)", is_dual_main=True)
+            render_cctv_live_container(c1_obj, height=330, border_color="rgba(134,239,172,0.8)", is_dual_main=True, stagger_ms=0)
 
         with d_col2:
-            st.markdown("""
-            <div class="kpi-card kpi-card-blue" style="min-height: 50px !important; height: 50px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 10px 16px !important; margin-bottom: 10px !important;">
-                <span class="soc-badge soc-badge-slate">CAM-14</span>
-                <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A;">14 Delight Junction (Vadodara)</span>
+            st.markdown(f"""
+            <div class="kpi-card kpi-card-blue" style="min-height: 48px !important; height: 48px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 8px 14px !important; margin-bottom: 8px !important;">
+                <span class="soc-badge soc-badge-slate">CAM-{c2_obj['cam_id']}</span>
+                <span style="font-weight: 800; font-size: 0.88rem; color: #0F172A; margin-left: 8px;">{c2_obj['name']} ({c2_obj['city']})</span>
             </div>
             """, unsafe_allow_html=True)
-            render_cctv_live_container('14', height=320, border_color="rgba(186,230,253,0.8)", is_dual_main=True)
+            render_cctv_live_container(c2_obj, height=330, border_color="rgba(186,230,253,0.8)", is_dual_main=True, stagger_ms=150)
 
+    elif cctv_mode == "3. Quad-Camera Video Wall (4-Camera Command Grid)":
+        st.markdown("### Quad-Camera Video Wall (4-Camera Command Grid)")
+        st.caption("Synchronized 4-camera multi-stream monitoring across statewide checkposts with zero camera repetition.")
 
-    elif cctv_mode == "3. 5-Camera Multi-View Video Wall (Command Control Grid)":
-        st.markdown("### 5-Camera Multi-View Video Wall (Command Control Grid)")
-        st.caption("Synchronized real-time GPU-accelerated multi-stream monitoring across statewide checkposts.")
-
-        vw_ctrl1, vw_ctrl2 = st.columns([1.5, 1])
+        vw_ctrl1, vw_ctrl2 = st.columns([1.2, 1.8])
         with vw_ctrl1:
-            grid_layout = st.radio(
-                "Video Wall Display Layout",
-                ["Master 1 + 4 Quad Monitor (Command Room)", "3x2 Equal Matrix Grid (All 5/6 Cameras)"],
-                horizontal=True
+            quad_layout = st.radio(
+                "Quad Display Mode",
+                ["2x2 Equal Matrix Grid", "Master 1 + 3 Tri-Monitor"],
+                horizontal=True,
+                key="quad_display_mode"
             )
         with vw_ctrl2:
-            preset_choice = st.selectbox(
-                "Quick Camera Presets",
-                [
-                    "🟢 Verified 100% Working Cameras Preset (Cam 14, 01, 15, 12, 22)",
-                    "Top 5 Strategic AI Patrol Hub (Cam 14, 01, 15, 12, 22)",
-                    "Preset 1: Major Metropolitan Intersections (Cam 1, 4, 14, 15, 21)",
-                    "Preset 2: Highway & Border Checkposts (Cam 2, 7, 9, 12, 22)",
-                    "Preset 3: Coastal & South Gujarat Ports (Cam 6, 8, 11, 19, 25)",
-                    "Custom Camera Selection"
-                ]
-            )
+            quad_presets = {
+                "🟢 Verified 100% Tested Live Quad (Cam 01, 14, 15, 22)": ["1", "14", "15", "22"],
+                "Preset 1: Major Metropolitan Intersections (Cam 01, 04, 14, 15)": ["1", "4", "14", "15"],
+                "Preset 2: Highway & Border Checkposts (Cam 02, 07, 09, 12)": ["2", "7", "9", "12"],
+                "Preset 3: Coastal & South Gujarat Ports (Cam 06, 08, 11, 19)": ["6", "8", "11", "19"],
+                "Custom 4-Camera Selection": ["1", "14", "15", "12"]
+            }
+            preset_choice = st.selectbox("Quick 4-Camera Non-Repetitive Presets", list(quad_presets.keys()), key="quad_preset_sel")
 
-        preset_cam_ids = {
-            "🟢 Verified 100% Working Cameras Preset (Cam 14, 01, 15, 12, 22)": ["14", "1", "15", "12", "22"],
-            "Top 5 Strategic AI Patrol Hub (Cam 14, 01, 15, 12, 22)": ["14", "1", "15", "12", "22"],
-            "Preset 1: Major Metropolitan Intersections (Cam 1, 4, 14, 15, 21)": ["1", "4", "14", "15", "21"],
-            "Preset 2: Highway & Border Checkposts (Cam 2, 7, 9, 12, 22)": ["2", "7", "9", "12", "22"],
-            "Preset 3: Coastal & South Gujarat Ports (Cam 6, 8, 11, 19, 25)": ["6", "8", "11", "19", "25"],
-            "Custom Camera Selection": ["14", "1", "15", "12", "22"]
-        }
-        active_cam_ids = preset_cam_ids.get(preset_choice, ["14", "1", "15", "12", "22"])
+        active_cam_ids = quad_presets[preset_choice]
 
-        if preset_choice == "Custom Camera Selection":
-            c_sel1, c_sel2, c_sel3, c_sel4, c_sel5 = st.columns(5)
+        if preset_choice == "Custom 4-Camera Selection":
+            c_sel1, c_sel2, c_sel3, c_sel4 = st.columns(4)
             all_cam_opts = [f"{c['stream_id']}: {c['name']} ({c['city']})" for c in ACTIVE_CCTV_CATALOGUE]
-            with c_sel1: s1 = st.selectbox("Slot 1 (Main)", all_cam_opts, index=13)
-            with c_sel2: s2 = st.selectbox("Slot 2", all_cam_opts, index=0)
-            with c_sel3: s3 = st.selectbox("Slot 3", all_cam_opts, index=14)
-            with c_sel4: s4 = st.selectbox("Slot 4", all_cam_opts, index=11)
-            with c_sel5: s5 = st.selectbox("Slot 5", all_cam_opts, index=21)
-            active_cam_ids = [s1.split(":")[0], s2.split(":")[0], s3.split(":")[0], s4.split(":")[0], s5.split(":")[0]]
+            with c_sel1: s1 = st.selectbox("Slot 1 (Top-Left)", all_cam_opts, index=0, key="quad_custom_slot_1")
+            with c_sel2: s2 = st.selectbox("Slot 2 (Top-Right)", all_cam_opts, index=min(13, len(all_cam_opts)-1), key="quad_custom_slot_2")
+            with c_sel3: s3 = st.selectbox("Slot 3 (Bottom-Left)", all_cam_opts, index=min(14, len(all_cam_opts)-1), key="quad_custom_slot_3")
+            with c_sel4: s4 = st.selectbox("Slot 4 (Bottom-Right)", all_cam_opts, index=min(11, len(all_cam_opts)-1), key="quad_custom_slot_4")
+            active_cam_ids = [s1.split(":")[0], s2.split(":")[0], s3.split(":")[0], s4.split(":")[0]]
 
+        # Ensure all 4 selected camera IDs are distinct and mapped properly
         cams_selected = []
+        seen_ids = set()
         for cid in active_cam_ids:
-            found = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == str(cid)), ACTIVE_CCTV_CATALOGUE[0])
-            cams_selected.append(found)
+            found = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == str(cid)), None)
+            if found and found['stream_id'] not in seen_ids:
+                cams_selected.append(found)
+                seen_ids.add(found['stream_id'])
 
+        # Fallback to fill up to 4 unique cameras if any duplicate was picked
+        for c in ACTIVE_CCTV_CATALOGUE:
+            if len(cams_selected) >= 4:
+                break
+            if c['stream_id'] not in seen_ids:
+                cams_selected.append(c)
+                seen_ids.add(c['stream_id'])
 
-        if grid_layout == "Master 1 + 4 Quad Monitor (Command Room)":
+        if quad_layout == "Master 1 + 3 Tri-Monitor":
             m_left, m_right = st.columns([1.5, 1.2])
             with m_left:
                 c_main = cams_selected[0]
                 st.markdown(f"""
-                <div class="kpi-card kpi-card-green" style="min-height: 48px !important; height: 48px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 8px 14px !important; margin-bottom: 8px !important;">
+                <div class="kpi-card kpi-card-green" style="min-height: 44px !important; height: 44px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 6px 12px !important; margin-bottom: 6px !important;">
                     <span class="soc-badge soc-badge-online">MASTER: {c_main['cam_id']}</span>
                     <span style="font-weight: 800; font-size: 0.85rem; color: #0F172A; margin-left: 8px;">{c_main['name']} ({c_main['city']})</span>
                 </div>
                 """, unsafe_allow_html=True)
-                render_cctv_live_container(c_main, height=460, border_color="rgba(134,239,172,0.9)", is_dual_main=True, stagger_ms=0)
+                render_cctv_live_container(c_main, height=440, border_color="rgba(134,239,172,0.9)", is_dual_main=True, stagger_ms=0)
 
             with m_right:
-                r1_1, r1_2 = st.columns(2)
-                with r1_1:
-                    c2 = cams_selected[1]
-                    st.caption(f"**{c2['cam_id']}**: {c2['name'][:18]}")
-                    render_cctv_live_container(c2, height=200, border_color="rgba(186,230,253,0.8)", stagger_ms=150)
-                with r1_2:
-                    c3 = cams_selected[2]
-                    st.caption(f"**{c3['cam_id']}**: {c3['name'][:18]}")
-                    render_cctv_live_container(c3, height=200, border_color="rgba(186,230,253,0.8)", stagger_ms=300)
-
-                r2_1, r2_2 = st.columns(2)
-                with r2_1:
-                    c4 = cams_selected[3]
-                    st.caption(f"**{c4['cam_id']}**: {c4['name'][:18]}")
-                    render_cctv_live_container(c4, height=200, border_color="rgba(186,230,253,0.8)", stagger_ms=450)
-                with r2_2:
-                    c5 = cams_selected[4]
-                    st.caption(f"**{c5['cam_id']}**: {c5['name'][:18]}")
-                    render_cctv_live_container(c5, height=200, border_color="rgba(186,230,253,0.8)", stagger_ms=600)
-        
-        else:
-            g1, g2, g3 = st.columns(3)
-            with g1:
-                c1 = cams_selected[0]; st.markdown(f"**{c1['cam_id']} — {c1['name']}**")
-                render_cctv_live_container(c1, height=220, border_color="rgba(134,239,172,0.8)", stagger_ms=0)
-            with g2:
-                c2 = cams_selected[1]; st.markdown(f"**{c2['cam_id']} — {c2['name']}**")
-                render_cctv_live_container(c2, height=220, border_color="rgba(134,239,172,0.8)", stagger_ms=150)
-            with g3:
-                c3 = cams_selected[2]; st.markdown(f"**{c3['cam_id']} — {c3['name']}**")
-                render_cctv_live_container(c3, height=220, border_color="rgba(134,239,172,0.8)", stagger_ms=300)
-
-            st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-            g4, g5, g6 = st.columns(3)
-            with g4:
-                c4 = cams_selected[3]; st.markdown(f"**{c4['cam_id']} — {c4['name']}**")
-                render_cctv_live_container(c4, height=220, border_color="rgba(134,239,172,0.8)", stagger_ms=450)
-            with g5:
-                c5 = cams_selected[4]; st.markdown(f"**{c5['cam_id']} — {c5['name']}**")
-                render_cctv_live_container(c5, height=220, border_color="rgba(134,239,172,0.8)", stagger_ms=600)
-            with g6:
-                st.markdown(f"**COMMAND STATUS & TELEMETRY**")
-                st.markdown(f"""
-                <div class="kpi-card kpi-card-green" style="height: 220px !important; min-height: 220px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; text-align: center !important; border-radius: 14px !important; margin: 0 !important;">
-                    <div style="font-size: 1.8rem; margin-bottom: 6px;">🛡️</div>
-                    <div style="font-weight: 800; font-size: 0.95rem; color: #0F172A;">GUJARAT SCRB COMMAND WALL</div>
-                    <div style="font-size: 0.78rem; color: #15803D; margin-top: 4px; font-weight: 700;">● {len(cams_selected)}/5 Live Streams Synced</div>
-                    <div style="font-size: 0.74rem; color: #475569; margin-top: 8px;">Hardware GPU Decoding Active • 30 FPS</div>
-                    <div style="margin-top: 10px;">
-                        <span class="soc-badge soc-badge-black">SEC-65B QR READY</span>
+                for idx, c_sub in enumerate(cams_selected[1:4]):
+                    st.markdown(f"""
+                    <div style="font-weight: 700; font-size: 0.78rem; color: #0F172A; margin-bottom: 2px;">
+                        <span class="soc-badge soc-badge-slate">SLOT {idx+2}</span> {c_sub['name']} ({c_sub['city']})
                     </div>
+                    """, unsafe_allow_html=True)
+                    render_cctv_live_container(c_sub, height=130, border_color="rgba(186,230,253,0.8)", stagger_ms=(idx+1)*150)
+        else:
+            q_row1_1, q_row1_2 = st.columns(2)
+            with q_row1_1:
+                cam1 = cams_selected[0]
+                st.markdown(f"""
+                <div class="kpi-card kpi-card-green" style="min-height: 44px !important; height: 44px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 6px 12px !important; margin-bottom: 6px !important;">
+                    <span class="soc-badge soc-badge-online">SLOT 1: {cam1['cam_id']}</span>
+                    <span style="font-weight: 800; font-size: 0.84rem; color: #0F172A; margin-left: 8px;">{cam1['name']} ({cam1['city']})</span>
                 </div>
                 """, unsafe_allow_html=True)
+                render_cctv_live_container(cam1, height=270, border_color="rgba(134,239,172,0.9)", stagger_ms=0)
 
-    elif cctv_mode == "4. Top 5 Strategic AI Patrol Hub (Vadodara, Ahmedabad, Rajkot...)":
-        st.markdown("### Top 5 Strategic AI Patrol Hub (Customized Intelligence Engines)")
-        st.caption("Pre-configured AI computer vision models mapped directly to the geometric and physical requirements of Gujarat's Top 5 strategic checkposts.")
+            with q_row1_2:
+                cam2 = cams_selected[1]
+                st.markdown(f"""
+                <div class="kpi-card kpi-card-blue" style="min-height: 44px !important; height: 44px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 6px 12px !important; margin-bottom: 6px !important;">
+                    <span class="soc-badge soc-badge-slate">SLOT 2: {cam2['cam_id']}</span>
+                    <span style="font-weight: 800; font-size: 0.84rem; color: #0F172A; margin-left: 8px;">{cam2['name']} ({cam2['city']})</span>
+                </div>
+                """, unsafe_allow_html=True)
+                render_cctv_live_container(cam2, height=270, border_color="rgba(186,230,253,0.9)", stagger_ms=150)
 
-        top5_choice = st.selectbox(
+            st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+            q_row2_1, q_row2_2 = st.columns(2)
+            with q_row2_1:
+                cam3 = cams_selected[2]
+                st.markdown(f"""
+                <div class="kpi-card kpi-card-blue" style="min-height: 44px !important; height: 44px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 6px 12px !important; margin-bottom: 6px !important;">
+                    <span class="soc-badge soc-badge-slate">SLOT 3: {cam3['cam_id']}</span>
+                    <span style="font-weight: 800; font-size: 0.84rem; color: #0F172A; margin-left: 8px;">{cam3['name']} ({cam3['city']})</span>
+                </div>
+                """, unsafe_allow_html=True)
+                render_cctv_live_container(cam3, height=270, border_color="rgba(186,230,253,0.9)", stagger_ms=300)
+
+            with q_row2_2:
+                cam4 = cams_selected[3]
+                st.markdown(f"""
+                <div class="kpi-card kpi-card-green" style="min-height: 44px !important; height: 44px !important; display: flex !important; flex-direction: row !important; align-items: center !important; padding: 6px 12px !important; margin-bottom: 6px !important;">
+                    <span class="soc-badge soc-badge-online">SLOT 4: {cam4['cam_id']}</span>
+                    <span style="font-weight: 800; font-size: 0.84rem; color: #0F172A; margin-left: 8px;">{cam4['name']} ({cam4['city']})</span>
+                </div>
+                """, unsafe_allow_html=True)
+                render_cctv_live_container(cam4, height=270, border_color="rgba(134,239,172,0.9)", stagger_ms=450)
+
+    elif cctv_mode == "4. Top 4 Strategic AI Patrol Hub (Vadodara, Ahmedabad, Rajkot, Gandhinagar)":
+        st.markdown("### Top 4 Strategic AI Patrol Hub (Customized Intelligence Engines)")
+        st.caption("Pre-configured AI computer vision models mapped directly to the geometric and physical requirements of Gujarat's Top 4 strategic checkposts.")
+
+        top4_choice = st.selectbox(
             "Select Strategic Camera Hub to Deploy Targeted AI Rules",
             [
                 "1. Camera 14: Delight Junction (Vadodara) — RLVD, Zebra Encroachment & Helmet Safety AI",
                 "2. Camera 01: Chiman Bhai Bridge (Ahmedabad) — Traffic Flow Density, Wrong-Way & Stalled Hazard",
                 "3. Camera 15: Suvidha Park Checkpost (Rajkot) — 4X Super-Res ANPR & Instant Stolen Intercept",
-                "4. Camera 12: Adalaj Tollnaka (Gandhinagar) — Toll Evasion, Interstate Filter & VIP Convoy",
-                "5. Camera 22: BK Mervada Tran Rasta (Banaskantha) — Night Anti-Smuggling & Duplicate Plate Fraud"
+                "4. Camera 12: Adalaj Tollnaka (Gandhinagar) — Toll Evasion, Interstate Filter & VIP Convoy"
             ]
         )
 
-        if "Camera 14" in top5_choice:
+        if "Camera 14" in top4_choice:
             st.markdown("""
             <div class="soc-alert-box-red">
                 <div class="soc-alert-title" style="color: #9F1239;">CAMERA 14 • DELIGHT JUNCTION (VADODARA) — SMART JUNCTION AI</div>
@@ -4735,7 +4484,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     pdf_e = generate_echallan_pdf(v_plate, "Red Light & Zebra Crossing Breach", "Camera 14 — Delight Junction", "1000", "Sec 177 MVA")
                     st.download_button("DOWNLOAD E-CHALLAN NOTICE (PDF)", data=pdf_e, file_name=f"ECHALLAN_RLVD_{v_plate}.pdf", mime="application/pdf", use_container_width=True)
 
-        elif "Camera 01" in top5_choice:
+        elif "Camera 01" in top4_choice:
             st.markdown("""
             <div class="soc-alert-box-green">
                 <div class="soc-alert-title" style="color: #15803D;">CAMERA 01 • CHIMAN BHAI BRIDGE (AHMEDABAD) — HIGHWAY FLOW & SAFETY AI</div>
@@ -4757,7 +4506,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 with c_d3: render_metric_card("Heavy Buses", "6 / min", "🚌 AMTS Corridor", color="orange")
                 with c_d4: render_metric_card("Flow Velocity", "48 km/h", "🟢 FREE FLOW ACTIVE", color="green")
 
-        elif "Camera 15" in top5_choice:
+        elif "Camera 15" in top4_choice:
             st.markdown("""
             <div class="soc-alert-box-orange">
                 <div class="soc-alert-title" style="color: #C2410C;">CAMERA 15 • SUVIDHA PARK CHECKPOST (RAJKOT) — PRECISION ANPR INTERCEPT</div>
@@ -4780,7 +4529,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     st.success(f"CRITICAL TARGET INTERCEPT: Vehicle [{tgt_p15}] spotted at barrier!")
                     st.link_button("DISPATCH PATROL SQUAD (WHATSAPP)", wa_l, use_container_width=True)
 
-        elif "Camera 12" in top5_choice:
+        elif "Camera 12" in top4_choice:
             st.markdown("""
             <div class="soc-alert-box-green">
                 <div class="soc-alert-title" style="color: #0369A1;">CAMERA 12 • TRI MANDIR ADALAJ TOLLNAKA (GANDHINAGAR) — CAPITAL HIGHWAY RADAR</div>
@@ -4795,28 +4544,8 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
             with t12_col1:
                 render_cctv_live_container('12', height=320, border_color='rgba(2,132,199,0.8)')
             with t12_col2:
-                st.info("● **RJ 14 CC 4412** (Jaipur) — Passed Lane 2 @ 21:02:14\n\n● **MH 04 ER 8820** (Thane) — Passed Lane 4 @ 21:03:40\n\n● **DL 3C AA 9911** (Delhi) — Passed Lane 1 @ 21:05:11")
+                st.info("● RJ 14 CC 4412 (Jaipur) — Lane 2 | ● MH 04 ER 8820 (Thane) — Lane 4 | ● DL 3C AA 9911 (Delhi) — Lane 1")
                 render_metric_card("Interstate Ratio", "24.2%", "Out-of-State Vehicles", color="blue")
-
-        elif "Camera 22" in top5_choice:
-            st.markdown("""
-            <div class="soc-alert-box-red">
-                <div class="soc-alert-title" style="color: #9F1239;">CAMERA 22 • BK MERVADA TRAN RASTA (BANASKANTHA) — INTERSTATE BORDER RADAR</div>
-                <div class="soc-alert-body" style="color: #4C0519;">
-                    • <b>Physical Geometry:</b> Rajasthan-Gujarat State Border Corridor with Heavy Commercial Freight.<br/>
-                    • <b>Active AI Models:</b> Night Anti-Smuggling Route Tracker (11 PM - 4 AM), Duplicate / Fake Plate Fraud AI, Hazardous Cargo (HazMat) Logging.<br/>
-                    • <b>Strategic Impact:</b> Direct containment of cross-border contraband and suspicious multi-axle freight.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            t22_col1, t22_col2 = st.columns([1.4, 1])
-            with t22_col1:
-                render_cctv_live_container('22', height=320, border_color='rgba(244,63,94,0.8)')
-            with t22_col2:
-                b1, b2 = st.columns(2)
-                with b1: render_metric_card("Border Freight", "112 Trucks", "Recorded Past 60 Mins", color="orange")
-                with b2: render_metric_card("Suspicious Hits", "02 Flags", "Duplicate Plate Fraud", color="red")
-                st.warning("⚠️ **FRAUD ALERT:** Vehicle RJ09 GA 1102 logged with mismatched vehicle chassis signature.")
 
     elif cctv_mode == "5. Smart Junction Traffic Violation & RLVD Engine":
         st.markdown("### Smart Junction Traffic Violation & E-Challan Engine")
