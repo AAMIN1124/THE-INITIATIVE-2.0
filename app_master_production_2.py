@@ -1874,52 +1874,6 @@ if not st.session_state.authenticated:
             else:
                 st.error("Invalid credentials. Unauthorized access attempt recorded.")
 
-        st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
-        st.markdown("**⚡ Quick-Fill Registered Officer Test Profiles:**")
-        q_c1, q_c2, q_c3 = st.columns(3)
-        with q_c1:
-            if st.button("👤 Aamin (1124)", use_container_width=True):
-                rec = authenticate_officer("AAMIN", "1124")
-                if rec:
-                    st.session_state.authenticated = True
-                    st.session_state.authenticated_username = "AAMIN"
-                    st.session_state.officer_profile = rec
-                    st.session_state.current_user = f"{rec['name']} ({rec['badge_id']})"
-                    st.rerun()
-            if st.button("👤 Pratham (1111)", use_container_width=True):
-                rec = authenticate_officer("PRATHAM", "1111")
-                if rec:
-                    st.session_state.authenticated = True
-                    st.session_state.authenticated_username = "PRATHAM"
-                    st.session_state.officer_profile = rec
-                    st.session_state.current_user = f"{rec['name']} ({rec['badge_id']})"
-                    st.rerun()
-        with q_c2:
-            if st.button("👤 Piyush (2222)", use_container_width=True):
-                rec = authenticate_officer("PIYUSH", "2222")
-                if rec:
-                    st.session_state.authenticated = True
-                    st.session_state.authenticated_username = "PIYUSH"
-                    st.session_state.officer_profile = rec
-                    st.session_state.current_user = f"{rec['name']} ({rec['badge_id']})"
-                    st.rerun()
-            if st.button("👤 Harsil (3333)", use_container_width=True):
-                rec = authenticate_officer("HARSIL", "3333")
-                if rec:
-                    st.session_state.authenticated = True
-                    st.session_state.authenticated_username = "HARSIL"
-                    st.session_state.officer_profile = rec
-                    st.session_state.current_user = f"{rec['name']} ({rec['badge_id']})"
-                    st.rerun()
-        with q_c3:
-            if st.button("👑 Admin (scrb2026)", use_container_width=True):
-                rec = authenticate_officer("ADMIN", "scrb2026")
-                if rec:
-                    st.session_state.authenticated = True
-                    st.session_state.authenticated_username = "ADMIN"
-                    st.session_state.officer_profile = rec
-                    st.session_state.current_user = f"{rec['name']} ({rec['badge_id']})"
-                    st.rerun()
     st.stop()
 
 # ----------------- DATASETS & MODEL MANAGEMENT (CACHED SINGLETON) -----------------
@@ -3670,37 +3624,85 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-with st.sidebar.expander("🔗 Dynamic External Stream Ingest (Jury URL/IP)", expanded=False):
-    jury_stream_url = st.text_input("Custom RTSP / HTTP / IP Camera Stream URL", placeholder="rtsp://admin:pass@ip:port/h264 or http://...", key="jury_stream_url_input")
-    jury_slot = st.selectbox("Assign to Camera Slot", ["Override Cam-01", "Override Cam-14", "Dedicated Jury Live Feed"], key="jury_slot_select")
+with st.sidebar.expander("🔗 Dynamic External Stream Ingest (1 to 4 Custom Links)", expanded=False):
+    num_ext_links = st.selectbox(
+        "Select Number of External Stream Links to Bind:",
+        [1, 2, 3, 4],
+        index=0,
+        key="num_ext_links_sel"
+    )
     
-    if st.button("⚡ Bind & Start Live Stream Ingestion", use_container_width=True, key="btn_bind_jury_stream"):
-        clean_j_url = jury_stream_url.strip()
-        if not clean_j_url:
-            st.error("Please enter a valid RTSP / HTTP stream URL.")
-        else:
-            with st.spinner("Probing stream connectivity (3s timeout)..."):
-                is_reachable = probe_stream_connectivity(clean_j_url, timeout_sec=2.5)
+    st.caption(f"Configuring {num_ext_links} dynamic stream endpoint(s) for live multi-camera monitoring & AI analytics.")
+    
+    ext_inputs = []
+    slot_options = [
+        "Dedicated Custom Ingest Node",
+        "Override Cam-01 (Ahmedabad)",
+        "Override Cam-14 (Vadodara)",
+        "Override Cam-15 (Rajkot)",
+        "Override Cam-12 (Gandhinagar)"
+    ]
+    
+    for link_idx in range(1, num_ext_links + 1):
+        st.markdown(f"**Stream #{link_idx} Configuration:**")
+        url_in = st.text_input(
+            f"External Stream #{link_idx} URL",
+            placeholder="rtsp://admin:pass@ip:port/h264 or http://...",
+            key=f"ext_stream_url_{link_idx}"
+        )
+        slot_in = st.selectbox(
+            f"Target Slot for Stream #{link_idx}",
+            slot_options,
+            index=0,
+            key=f"ext_stream_slot_{link_idx}"
+        )
+        ext_inputs.append((link_idx, url_in, slot_in))
+        st.markdown("<hr style='margin: 6px 0; border-color: rgba(255,255,255,0.1);'/>", unsafe_allow_html=True)
+    
+    if st.button(f"⚡ Bind & Deploy {num_ext_links} External Stream(s)", use_container_width=True, key="btn_bind_multi_external_streams"):
+        bound_count = 0
+        for link_idx, raw_url, target_slot in ext_inputs:
+            clean_url = raw_url.strip()
+            if clean_url:
+                if "Cam-01" in target_slot:
+                    slot_key = "1"
+                elif "Cam-14" in target_slot:
+                    slot_key = "14"
+                elif "Cam-15" in target_slot:
+                    slot_key = "15"
+                elif "Cam-12" in target_slot:
+                    slot_key = "12"
+                else:
+                    slot_key = f"JURY-{link_idx}" if num_ext_links > 1 else "JURY"
                 
-            if is_reachable:
-                slot_key = "1" if "Cam-01" in jury_slot else ("14" if "Cam-14" in jury_slot else "JURY")
-                st.session_state.setdefault("stream_overrides", {})[slot_key] = clean_j_url
+                st.session_state.setdefault("stream_overrides", {})[slot_key] = clean_url
                 
-                if slot_key == "JURY":
+                if "JURY" in slot_key:
                     jury_node = {
-                        "stream_id": "JURY",
-                        "cam_id": "CAM-JURY",
-                        "name": "Dedicated Jury Live Feed (Custom Ingest)",
-                        "lat": 23.2156,
-                        "lon": 72.6369,
+                        "stream_id": slot_key,
+                        "cam_id": f"CAM-{slot_key}",
+                        "name": f"External Stream #{link_idx} ({clean_url[:20]}...)",
+                        "lat": 23.2156 + (link_idx * 0.012),
+                        "lon": 72.6369 + (link_idx * 0.012),
                         "city": "Gandhinagar Command",
                         "type": "Custom RTSP/IP Stream",
-                        "dept": "Jury Evaluation Grid",
+                        "dept": "External Ingest Grid",
                         "status": "ONLINE",
                         "verified": True,
-                        "custom_url": clean_j_url
+                        "custom_url": clean_url,
+                        "ai_features": [
+                            "1. 🎯 Super-Res Frontal ANPR & eGujCop Watchlist",
+                            "2. 🚦 Smart RLVD & Stop-Line Breach Engine",
+                            "3. 🏎️ Homography Perspective Speed Radar (km/h)",
+                            "4. 🛵 Neural Contour Helmet & Triple Riding Sentry",
+                            "5. 📊 Multi-Class Traffic Density & Flow Meter",
+                            "6. 👤 512-D NAFIS Facial Biometric Search (FRS)",
+                            "7. 🐮 Stray Cattle / Animal Collision Hazard (Cow/Cattle)",
+                            "8. 🎒 Unattended Baggage & Stationary Object AI",
+                            "9. ⚠️ Roadside Vehicle Breakdown & Hazard Sentry"
+                        ]
                     }
-                    ex_i = next((i for i, c in enumerate(ACTIVE_CCTV_CATALOGUE) if str(c.get("stream_id")) == "JURY"), -1)
+                    ex_i = next((i for i, c in enumerate(ACTIVE_CCTV_CATALOGUE) if str(c.get("stream_id")) == slot_key), -1)
                     if ex_i != -1:
                         ACTIVE_CCTV_CATALOGUE[ex_i] = jury_node
                     else:
@@ -3708,33 +3710,31 @@ with st.sidebar.expander("🔗 Dynamic External Stream Ingest (Jury URL/IP)", ex
                 else:
                     t_cam = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c.get("stream_id")) == slot_key), None)
                     if t_cam:
-                        t_cam["custom_url"] = clean_j_url
-                        t_cam["type"] = "Overridden Jury Live Feed"
+                        t_cam["custom_url"] = clean_url
+                        t_cam["type"] = f"Overridden External Feed #{link_idx}"
                         cid = t_cam["cam_id"]
                         if cid in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS[cid].is_alive():
                             stop_camera_daemon(cid)
                             time.sleep(0.05)
                             start_camera_daemon(t_cam)
-
-                st.success(f"🟢 Stream successfully bound to {jury_slot}!")
-                log_audit_trail(prof['name'], f"Bound Dynamic Stream to {jury_slot}: {clean_j_url}")
-                time.sleep(0.5)
-                st.rerun()
-            else:
-                st.error("⚠️ Stream Unreachable. Verify network connectivity, RTSP credentials, or port forwarding.")
-                if st.button("Force Bind Anyway (Offline Subnet)", key="btn_force_bind_stream"):
-                    slot_key = "1" if "Cam-01" in jury_slot else ("14" if "Cam-14" in jury_slot else "JURY")
-                    st.session_state.setdefault("stream_overrides", {})[slot_key] = clean_j_url
-                    st.warning(f"Forced binding to {jury_slot}.")
-                    st.rerun()
+                
+                bound_count += 1
+                log_audit_trail(prof['name'], f"Bound Dynamic External Stream #{link_idx} to {target_slot}: {clean_url}")
+        
+        if bound_count > 0:
+            st.success(f"🟢 Successfully bound {bound_count} external stream link(s)!")
+            time.sleep(0.4)
+            st.rerun()
+        else:
+            st.error("Please enter at least one valid external stream URL.")
 
     active_ov = st.session_state.get("stream_overrides", {})
     if active_ov:
         st.markdown("<hr style='margin: 8px 0; border-color: rgba(255,255,255,0.15);'/>", unsafe_allow_html=True)
-        st.caption("Active Overrides:")
+        st.caption("Active Bound Overrides:")
         for k_s, u_s in list(active_ov.items()):
-            st.caption(f"• **Slot {k_s}:** `{u_s[:22]}...`")
-        if st.button("Reset Stream Overrides", key="btn_reset_all_overrides", use_container_width=True):
+            st.caption(f"• **Slot {k_s}:** `{u_s[:24]}...`")
+        if st.button("Reset All External Stream Overrides", key="btn_reset_all_overrides", use_container_width=True):
             st.session_state.stream_overrides = {}
             st.rerun()
 
