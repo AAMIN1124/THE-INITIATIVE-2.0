@@ -272,6 +272,7 @@ with GLOBAL_SIGHTINGS_LOCK:
 
 # ----------------- STATIC & DYNAMIC CCTV DISCOVERY DEFINITIONS (PRE-INIT) -----------------
 GATEWAY_DISCOVERY_URL = os.environ.get("GATEWAY_DISCOVERY_URL", "https://live.corp8.cloud/api/ingest")
+SENTINEL_ACCESS_TOKEN = os.environ.get("SENTINEL_ACCESS_TOKEN", "SYU2-RUFT-5N7B")
 DISCOVERY_CACHE = {"last_fetch": 0.0, "backoff": 2.0, "cameras": []}
 
 STATIC_CCTV_CATALOGUE = [
@@ -493,10 +494,7 @@ def discover_live_cctv_endpoints(base_url="https://live.corp8.cloud/api/ingest",
     try:
         req = urllib.request.Request(
             url,
-            headers={
-                "User-Agent": "SCRB-Dynamic-Discovery/2.0",
-                "Accept": "application/json"
-            }
+            headers={"User-Agent": "SCRB-Dynamic-Discovery/2.0", "Accept": "application/json", "Authorization": f"Bearer {SENTINEL_ACCESS_TOKEN}", "X-Access-Password": SENTINEL_ACCESS_TOKEN}
         )
         with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
             if resp.status == 200:
@@ -596,11 +594,7 @@ def capture_live_frame_from_stream(cam_dict):
         target_host = urllib.parse.urlparse(custom_url).hostname or "live.corp8.cloud"
         target_port = urllib.parse.urlparse(custom_url).port or (443 if "https" in custom_url else 80)
     else:
-        urls_to_try = [
-            f"http://live.corp8.cloud/stream/{clean_id}",
-            f"https://live.corp8.cloud/stream/{clean_id}",
-            f"rtsp://live.corp8.cloud:8554/stream/{clean_id}"
-        ]
+        urls_to_try = [f"http://live.corp8.cloud/stream/{clean_id}?token={SENTINEL_ACCESS_TOKEN}", f"https://live.corp8.cloud/stream/{clean_id}?token={SENTINEL_ACCESS_TOKEN}", f"http://live.corp8.cloud/stream/{clean_id}", f"https://live.corp8.cloud/stream/{clean_id}", f"rtsp://live.corp8.cloud:8554/stream/{clean_id}"]
         target_host = "live.corp8.cloud"
         target_port = 80
 
@@ -2825,7 +2819,7 @@ def get_active_stream_url(identifier):
         return str(overrides["JURY"]).strip()
     
     clean_num = str(int(st_id)) if st_id.isdigit() else st_id
-    return f"https://live.corp8.cloud/stream/{clean_num}"
+    return f"https://live.corp8.cloud/stream/{clean_num}?token={SENTINEL_ACCESS_TOKEN}"
 
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
     if isinstance(cam_obj, dict):
