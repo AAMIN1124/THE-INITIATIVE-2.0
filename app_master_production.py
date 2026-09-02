@@ -568,8 +568,8 @@ def is_stream_server_alive(host="live.corp8.cloud", port=80, timeout_sec=0.35):
 
 def capture_live_frame_from_stream(cam_dict):
     """
-    Direct live frame grabber with Government Sentinel Access Password (SYU2-RUFT-5N7B).
-    Features automated origin error recovery and guaranteed non-blocking frame ingestion.
+    Strict Live Frame Grabber (100% Real Stream Ingest - Zero Fallbacks).
+    Forces RTSP over TCP with Government Sentinel Pass Authentication.
     """
     pass_token = "SYU2-RUFT-5N7B"
     if isinstance(cam_dict, dict):
@@ -619,42 +619,20 @@ def capture_live_frame_from_stream(cam_dict):
 
     os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1200"
 
-    # Attempt remote stream first if server socket is reachable
-    if is_stream_server_alive(target_host, target_port, timeout_sec=0.25):
-        for stream_url in urls_to_try:
-            try:
-                cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
-                if not cap.isOpened():
-                    cap = cv2.VideoCapture(stream_url)
-                if cap.isOpened():
-                    for _ in range(4):
-                        ret, frame = cap.read()
-                        if ret and frame is not None and frame.size > 0:
-                            cap.release()
-                            return True, frame
-                    cap.release()
-            except Exception:
-                pass
-
-    # Seamless Local Checkpost Video Recovery
-    fallback_candidates = [
-        os.path.join(os.path.dirname(__file__), f"fallback_feeds/cam_{clean_id}.mp4"),
-        os.path.join(os.path.dirname(__file__), "live_recorded_incident.mp4"),
-        os.path.join(os.path.dirname(__file__), "temp_cctv_input.mp4")
-    ]
-    for fb_path in fallback_candidates:
-        if os.path.exists(fb_path):
-            try:
-                cap_fb = cv2.VideoCapture(fb_path)
-                if cap_fb.isOpened():
-                    total_f = int(cap_fb.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
-                    cap_fb.set(cv2.CAP_PROP_POS_FRAMES, int(time.time() * 25) % total_f)
-                    ret_fb, frame_fb = cap_fb.read()
-                    cap_fb.release()
-                    if ret_fb and frame_fb is not None and frame_fb.size > 0:
-                        return True, frame_fb
-            except Exception:
-                pass
+    for stream_url in urls_to_try:
+        try:
+            cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(stream_url)
+            if cap.isOpened():
+                for _ in range(4):
+                    ret, frame = cap.read()
+                    if ret and frame is not None and frame.size > 0:
+                        cap.release()
+                        return True, frame
+                cap.release()
+        except Exception:
+            pass
 
     return False, None
 
@@ -2873,6 +2851,10 @@ def get_active_stream_url(identifier):
     return f"https://live.corp8.cloud/stream/{clean_num}?pass={pass_token}&token={pass_token}&auth={pass_token}"
 
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
+    """
+    Pure Direct Live Stream HTML5 Player (Zero Fallbacks).
+    Streams live RTSP/HLS/HTTP endpoints directly to the UI.
+    """
     if isinstance(cam_obj, dict):
         cam_dict = cam_obj
         st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "14")))
@@ -2887,28 +2869,10 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         st_id = st_id.split("-")[-1]
     clean_id = str(int(st_id)) if st_id.isdigit() else st_id
     
-    video_src = get_active_stream_url(cam_dict)
     cam_id_tag = cam_dict.get("cam_id", f"CAM-{int(clean_id):02d}" if clean_id.isdigit() else clean_id)
-    badge_html = f'''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:monospace;">🔴 LIVE • {cam_id_tag}</div>'''
+    video_src = get_active_stream_url(cam_dict)
 
-    # Check for local fallback video
-    fallback_b64 = ""
-    fallback_candidates = [
-        os.path.join(os.path.dirname(__file__), f"fallback_feeds/cam_{clean_id}.mp4"),
-        os.path.join(os.path.dirname(__file__), "live_recorded_incident.mp4"),
-        os.path.join(os.path.dirname(__file__), "temp_cctv_input.mp4")
-    ]
-    for fb_path in fallback_candidates:
-        if os.path.exists(fb_path):
-            try:
-                with open(fb_path, "rb") as vf:
-                    v_bytes = vf.read()
-                    import base64
-                    fallback_b64 = f"data:video/mp4;base64,{base64.b64encode(v_bytes).decode('utf-8')}"
-                    break
-            except Exception:
-                pass
-
+    badge_html = f'''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:monospace;">🔴 LIVE STREAM • {cam_id_tag}</div>'''
     style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
     dom_id = f"vid_feed_{clean_id}"
     
@@ -2931,43 +2895,13 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 <script>
     (function() {{
         var v = document.getElementById('{dom_id}');
-        var fb = "{fallback_b64}";
         var delay = {stagger_ms};
-        
-        function tryFallback() {{
-            if (fb && v.src !== fb) {{
-                v.src = fb;
-                v.play().catch(function(){{}});
-            }}
-        }}
-
-        v.onerror = function() {{
-            tryFallback();
-        }};
-
-        // If video stalls or fails to load within 2.5s, auto-switch to authenticated fallback
-        var loadTimer = setTimeout(function() {{
-            if (v.readyState === 0 && fb) {{
-                tryFallback();
-            }}
-        }}, 2500);
-
         function start() {{
             try {{
                 v.muted = true;
-                var p = v.play();
-                if (p !== undefined) {{
-                    p.catch(function() {{
-                        setTimeout(function() {{ 
-                            v.play().catch(function() {{ tryFallback(); }}); 
-                        }}, 200);
-                    }});
-                }}
-            }} catch(e) {{
-                tryFallback();
-            }}
+                v.play().catch(function(){{}});
+            }} catch(e) {{}}
         }}
-        
         if (delay > 0) {{
             setTimeout(start, delay);
         }} else {{
@@ -2977,21 +2911,19 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 </script>
 </body>
 </html>'''
-
     try:
         components.html(full_html, height=height + 15)
     except Exception:
         st.markdown(full_html, unsafe_allow_html=True)
 
+
 def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo_model=None, ocr_reader=None):
     """
-    Gujarat Police Hackathon 2026 Autonomous 24/7 Sentry & Rule-Break Daemon:
-    1. Real-time Multi-Class Traffic Density (Cars, Bikes, Trucks, Buses, Autos).
-    2. Homography Perspective Speed Radar (km/h) + Auto Section 183 MV Act Challan.
-    3. Neural Two-Wheeler Triple Riding & Helmet Sentry (Sec 194C & Sec 129 MV Act).
-    4. Smart RLVD Stop-Line Breach Detection (Sec 184 MV Act).
-    5. Continuous eGujCop & NAFIS 512-D Criminal Watchlist ANPR/FRS Sentry.
-    6. Hardware PTS Driven Timing (CAP_PROP_POS_MSEC) with Zero UI Freezing.
+    Gujarat Police Hackathon 2026 Strict Live Stream Daemon (Zero Fallbacks):
+    1. Direct Ingestion from live RTSP/HTTP endpoints over TCP.
+    2. Exponential backoff (2.0s to 30.0s) reconnection on stream loss.
+    3. Hardware PTS extraction via cv2.CAP_PROP_POS_MSEC.
+    4. 100% Real-time inference on actual live frames only.
     """
     if isinstance(cam_obj, dict):
         cam_id = str(cam_obj.get("cam_id", cam_obj.get("stream_id", "CAM-01")))
@@ -3017,18 +2949,10 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo
         except Exception:
             pass
 
+    backoff_delay = 2.0
+    max_backoff = 30.0
     last_sample_time = 0.0
     track_counter = 0
-    sim_pts_sec = 0.0
-
-    sample_sentry_scenarios = [
-        ("GJ 01 BX 4412", "Car", "Vadodara Highway", "Clear (No Active Warrant)", 54.2, "CLEAR", 0, "No Biometric Alert"),
-        ("GJ 06 CD 8842", "Truck", "Ahmedabad Express Highway", "CRITICAL eGujCop HIT: FIR-2026-8842 (Over-speeding / Contraband Transit)", 78.6, "Section 183 MV Act (Overspeeding 78 km/h in 60 zone)", 1500, "NAFIS 512-D MATCH: Suspect Vikram Rathore (94.2%)"),
-        ("GJ 05 EF 9102", "Motorcycle", "Surat Intercept Point", "Clear (No Active Warrant)", 42.1, "Section 194C MV Act (Triple Riding: 3 Persons on Bike)", 1000, "No Biometric Alert"),
-        ("GJ 27 GH 4411", "Motorcycle", "Gandhinagar Smart Corridor", "Clear (No Active Warrant)", 48.0, "Section 129 MV Act (Rider Without Safety Helmet)", 500, "No Biometric Alert"),
-        ("MH 04 ER 8820", "Car", "Ratanpur Border Checkpost", "CRITICAL eGujCop HIT: FIR-2026-1111 (Illegal Liquor Transport (Prohibition Act))", 62.4, "Section 184 MV Act (Dangerous Driving / Stop-Line Breach)", 1000, "NAFIS 512-D MATCH: Suspect Aslam Khan (91.8%)"),
-        ("DL 03 AA 9911", "Car", "Paldi Circle Junction", "Clear (No Active Warrant)", 38.5, "CLEAR", 0, "No Biometric Alert")
-    ]
 
     while not stop_event.is_set():
         stream_urls_to_try = [
@@ -3040,83 +2964,35 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo
         ]
         stream_urls_to_try = [u for u in stream_urls_to_try if u]
         
-        server_alive = is_stream_server_alive("live.corp8.cloud", 80, timeout_sec=0.25)
         cap = None
-        if server_alive:
+        for stream_url in stream_urls_to_try:
+            if stop_event.is_set():
+                break
             try:
-                for stream_url in stream_urls_to_try:
-                    if stop_event.is_set():
-                        break
-                    try:
-                        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1200"
-                        temp_cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
-                        if not temp_cap.isOpened():
-                            temp_cap = cv2.VideoCapture(stream_url)
-                        if temp_cap.isOpened():
-                            cap = temp_cap
-                            break
-                        else:
-                            if temp_cap is not None:
-                                temp_cap.release()
-                    except Exception:
-                        pass
+                os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1500"
+                temp_cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
+                if not temp_cap.isOpened():
+                    temp_cap = cv2.VideoCapture(stream_url)
+                if temp_cap.isOpened():
+                    cap = temp_cap
+                    break
+                else:
+                    if temp_cap is not None:
+                        temp_cap.release()
             except Exception:
                 pass
 
         if cap is None or not cap.isOpened():
-            # Autonomous Sentry Loop during Remote Downtime (Zero Drop in Security)
-            now = time.time()
-            if now - last_sample_time >= sample_interval:
-                last_sample_time = now
-                sim_pts_sec += sample_interval
-                pts_str = format_exact_pts(sim_pts_sec)
-                
-                track_counter += 1
-                scenario = sample_sentry_scenarios[track_counter % len(sample_sentry_scenarios)]
-                sim_plate, sim_vtype, sim_loc, sim_status, sim_spd, sim_viol, sim_fine, sim_frs = scenario
-                
-                challan_id = f"ECH-GJ-{time.strftime('%Y%m')}-{track_counter:04d}" if sim_fine > 0 else "N/A"
-                
-                event_payload = {
-                    "Event ID": f"SENTRY-{cam_id}-{track_counter:04d}",
-                    "Challan ID": challan_id,
-                    "Entry Time": pts_str,
-                    "Exit Time": pts_str,
-                    "Peak Clarity Time": pts_str,
-                    "Duration": f"{round(sim_pts_sec, 1)}s (PTS)",
-                    "PTS Seconds": sim_pts_sec,
-                    "Vehicle Type": sim_vtype,
-                    "Vehicle Class": sim_vtype,
-                    "Event Type": "AUTONOMOUS SENTRY SIGHTING",
-                    "Consensus Plate / Details": f"License Plate: [{sim_plate}]",
-                    "Detected Plate": sim_plate,
-                    "Speed_kmh": sim_spd,
-                    "Speed": f"{sim_spd} km/h",
-                    "Violation": sim_viol,
-                    "Penalty_INR": sim_fine,
-                    "Fine": f"₹{sim_fine}" if sim_fine > 0 else "None",
-                    "FRS_Match": sim_frs,
-                    "Match Confidence": "98.4%",
-                    "YOLO Confidence": "96.2%",
-                    "OCR Confidence": "98.4%",
-                    "Checkpost Location": f"{cam_id}: {cam_name} ({cam_city})",
-                    "City": cam_city,
-                    "Lat": cam_lat,
-                    "Lon": cam_lon,
-                    "Plate_Clean": clean_str(sim_plate),
-                    "eGujCop Status": sim_status,
-                    "Source": f"Autonomous Sentry ({cam_id})"
-                }
-                with GLOBAL_SIGHTINGS_LOCK:
-                    GLOBAL_SIGHTINGS_BUFFER.append(event_payload)
-                    log_sighting_to_db(event_payload)
-
-            for _ in range(int(sample_interval * 10)):
+            # Exponential Backoff Reconnection (Mandatory Rule Compliance: 2s to 30s)
+            for _ in range(int(backoff_delay * 10)):
                 if stop_event.is_set():
                     break
                 time.sleep(0.1)
+            backoff_delay = min(max_backoff, backoff_delay * 1.5)
             continue
 
+        # Connected to live stream -> reset backoff delay
+        backoff_delay = 2.0
         last_known_pts_ms = 0.0
         try:
             while not stop_event.is_set():
@@ -3159,11 +3035,9 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo
                             egujcop_match = lookup_egujcop_record(top_p)
                             egujcop_tag = f"CRITICAL eGujCop HIT: {egujcop_match['fir_no']} ({egujcop_match['offence']})" if egujcop_match else "Clear (No Active Warrant)"
 
-                            # Calculate Homography Perspective Speed
                             x1, y1, x2, y2 = item["box"]
                             approx_speed = round(40.0 + ((y2 / max(1, fh)) * 32.0), 1)
                             
-                            # Determine Rule Break
                             if approx_speed > 60.0:
                                 viol_type = f"Section 183 MV Act (Overspeeding {approx_speed} km/h in 60 zone)"
                                 fine_inr = 1500
