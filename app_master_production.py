@@ -4057,16 +4057,16 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
 
         m_c1, m_c2, m_c3, m_c4 = st.columns(4)
         with m_c1:
-            render_metric_card("Traffic Flow Index", f"{max(8, total_sentry_events * 2)} / min", "Multi-Class Volume", "#0369A1", "traffic_idx")
+            render_metric_card("Traffic Flow Index", f"{max(8, total_sentry_events * 2)} / min", "Multi-Class Volume", color="blue")
         with m_c2:
-            spd_color = "#DC2626" if avg_speed > 60 else "#0369A1"
-            render_metric_card("Live Speed Radar", f"{avg_speed} km/h", f"Max Peak: {max_speed} km/h", spd_color, "spd_radar")
+            spd_color = "red" if avg_speed > 60 else "blue"
+            render_metric_card("Live Speed Radar", f"{avg_speed} km/h", f"Max Peak: {max_speed} km/h", color=spd_color)
         with m_c3:
-            v_color = "#DC2626" if violations_count > 0 else "#15803D"
-            render_metric_card("MV Act Violations", f"{violations_count} Flagged", "Auto E-Challan Active", v_color, "mv_viols")
+            v_color = "red" if violations_count > 0 else "green"
+            render_metric_card("MV Act Violations", f"{violations_count} Flagged", "Auto E-Challan Active", color=v_color)
         with m_c4:
-            w_color = "#DC2626" if watchlist_hits_count > 0 else "#15803D"
-            render_metric_card("Watchlist Hits", f"{watchlist_hits_count} Detected", "eGujCop / NAFIS FRS", w_color, "wl_hits")
+            w_color = "red" if watchlist_hits_count > 0 else "green"
+            render_metric_card("Watchlist Hits", f"{watchlist_hits_count} Detected", "eGujCop / NAFIS FRS", color=w_color)
 
         # Live Real-Time Sentry Incident & E-Challan Feed
         st.markdown("#### 🚨 Real-Time Autonomous Incident & E-Challan Deck")
