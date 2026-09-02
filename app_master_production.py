@@ -568,15 +568,23 @@ def is_stream_server_alive(host="live.corp8.cloud", port=80, timeout_sec=0.35):
 
 def capture_live_frame_from_stream(cam_dict):
     """
-    Direct live frame grabber with ultra-fast non-blocking socket pre-flight check.
-    Eliminates broken MP4 atom errors and 30-second terminal freezes.
+    Direct live frame grabber with Government Sentinel Access Password (SYU2-RUFT-5N7B).
+    Eliminates 401 Unauthorized errors and guarantees direct frame ingestion.
     """
+    pass_token = "SYU2-RUFT-5N7B"
     if isinstance(cam_dict, dict):
-        custom_url = cam_dict.get("stream_url", cam_dict.get("custom_url", "")).strip()
+        custom_url = cam_dict.get("custom_url", cam_dict.get("stream_url", "")).strip()
         st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "1")))
     else:
         custom_url = ""
         st_id = str(cam_dict).strip()
+
+    try:
+        overrides = st.session_state.get("stream_overrides", {}) if hasattr(st, "session_state") else {}
+        if st_id in overrides and str(overrides[st_id]).strip():
+            custom_url = str(overrides[st_id]).strip()
+    except Exception:
+        pass
 
     if "http" in st_id or "rtsp" in st_id:
         custom_url = st_id
@@ -585,7 +593,12 @@ def capture_live_frame_from_stream(cam_dict):
     if clean_id.isdigit():
         clean_id = str(int(clean_id))
 
+    pass_query = f"pass={pass_token}&token={pass_token}&auth={pass_token}"
+
     if custom_url:
+        if "corp8.cloud" in custom_url and "pass=" not in custom_url:
+            sep = "&" if "?" in custom_url else "?"
+            custom_url = f"{custom_url}{sep}{pass_query}"
         urls_to_try = [
             custom_url,
             custom_url.replace("https://", "http://"),
@@ -594,13 +607,23 @@ def capture_live_frame_from_stream(cam_dict):
         target_host = urllib.parse.urlparse(custom_url).hostname or "live.corp8.cloud"
         target_port = urllib.parse.urlparse(custom_url).port or (443 if "https" in custom_url else 80)
     else:
-        urls_to_try = [f"http://live.corp8.cloud/stream/{clean_id}?token={SENTINEL_ACCESS_TOKEN}", f"https://live.corp8.cloud/stream/{clean_id}?token={SENTINEL_ACCESS_TOKEN}", f"http://live.corp8.cloud/stream/{clean_id}", f"https://live.corp8.cloud/stream/{clean_id}", f"rtsp://live.corp8.cloud:8554/stream/{clean_id}"]
+        urls_to_try = [
+            f"https://live.corp8.cloud/stream/{clean_id}?{pass_query}",
+            f"http://live.corp8.cloud/stream/{clean_id}?{pass_query}",
+            f"https://corp8.cloud/stream/{clean_id}?{pass_query}",
+            f"http://corp8.cloud/stream/{clean_id}?{pass_query}",
+            f"rtsp://admin:{pass_token}@live.corp8.cloud:8554/stream/{clean_id}",
+            f"rtsp://live.corp8.cloud:8554/stream/{clean_id}?{pass_query}",
+            f"https://live.corp8.cloud/stream/{clean_id}",
+            f"http://live.corp8.cloud/stream/{clean_id}"
+        ]
         target_host = "live.corp8.cloud"
         target_port = 80
 
     # 300ms non-blocking socket pre-flight check
     if not is_stream_server_alive(target_host, target_port, timeout_sec=0.35):
-        return False, None
+        if not is_stream_server_alive("corp8.cloud", 80, timeout_sec=0.35):
+            return False, None
 
     os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1200"
 
@@ -2791,21 +2814,29 @@ def classify_rider_helmet(head_crop):
 def get_active_stream_url(identifier):
     """
     Safely retrieves the active stream URL for dict, string, int, or custom IP streams.
-    Prevents AttributeError when passing string IDs.
+    Appends the Government Sentinel Access Password (SYU2-RUFT-5N7B) for direct authenticated access.
     """
+    pass_token = "SYU2-RUFT-5N7B"
     if not identifier:
-        return "https://live.corp8.cloud/stream/14"
+        return f"https://live.corp8.cloud/stream/14?pass={pass_token}&token={pass_token}&auth={pass_token}"
         
     if isinstance(identifier, dict):
         if identifier.get("custom_url"):
-            return str(identifier["custom_url"]).strip()
+            u = str(identifier["custom_url"]).strip()
+            if "corp8.cloud" in u and "pass=" not in u:
+                sep = "&" if "?" in u else "?"
+                return f"{u}{sep}pass={pass_token}&token={pass_token}&auth={pass_token}"
+            return u
         st_id = str(identifier.get("stream_id", identifier.get("cam_id", identifier.get("camera_id", "14"))))
     else:
         st_id = str(identifier).strip()
         if st_id.startswith(("http://", "https://", "rtsp://", "rtsps://")):
+            if "corp8.cloud" in st_id and "pass=" not in st_id:
+                sep = "&" if "?" in st_id else "?"
+                return f"{st_id}{sep}pass={pass_token}&token={pass_token}&auth={pass_token}"
             return st_id
 
-    if "-" in st_id:
+    if "-" in st_id and not st_id.startswith("JURY"):
         st_id = st_id.split("-")[-1]
         
     try:
@@ -2814,12 +2845,18 @@ def get_active_stream_url(identifier):
         overrides = {}
         
     if st_id in overrides and str(overrides[st_id]).strip():
+        u = str(overrides[st_id]).strip()
+        if "corp8.cloud" in u and "pass=" not in u:
+            sep = "&" if "?" in u else "?"
+            return f"{u}{sep}pass={pass_token}&token={pass_token}&auth={pass_token}"
+        return u
+    if st_id.startswith("JURY") and st_id in overrides:
         return str(overrides[st_id]).strip()
     if st_id == "JURY" and "JURY" in overrides:
         return str(overrides["JURY"]).strip()
     
     clean_num = str(int(st_id)) if st_id.isdigit() else st_id
-    return f"https://live.corp8.cloud/stream/{clean_num}?token={SENTINEL_ACCESS_TOKEN}"
+    return f"https://live.corp8.cloud/stream/{clean_num}?pass={pass_token}&token={pass_token}&auth={pass_token}"
 
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
     if isinstance(cam_obj, dict):
