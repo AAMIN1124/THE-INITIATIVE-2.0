@@ -125,11 +125,11 @@ def init_officer_profile_store():
         """)
         
         default_officers = [
-            ("AAMIN", "1124", "Officer Aamin", "Senior Cyber Forensic Examiner & ANPR Grid Lead", "GP-SCRB-8842", "State Crime Record Bureau (SCRB)", "SCRB Cyber Command Grid, Gandhinagar", "+91 94280 11240", "aamin.scrb@gujarat.gov.in", "Level 4 (State Forensics Clearance)", "14-Feb-2021", None),
-            ("PRATHAM", "1111", "Officer Pratham", "Deputy Superintendent of Police (Cyber & ANPR Ops)", "GP-SCRB-9102", "Crime Branch Intelligence", "Crime Branch HQ, Ahmedabad", "+91 98250 11110", "pratham.police@gujarat.gov.in", "Level 4 (State Intelligence Clearance)", "10-Jan-2020", None),
-            ("PIYUSH", "2222", "Officer Piyush", "Inspector of Police (Highway Intercept Command)", "GP-SCRB-7341", "Highway Safety & Traffic Branch", "Vadodara Highway Command Center", "+91 98790 22220", "piyush.traffic@gujarat.gov.in", "Level 3 (Highway Intercept Clearance)", "15-Aug-2021", None),
-            ("HARSIL", "3333", "Officer Harsil", "Sub-Inspector & Video Forensics Specialist", "GP-SCRB-6250", "Forensic Science & Surveillance Wing", "Rajkot Zone Surveillance Hub", "+91 99090 33330", "harsil.forensics@gujarat.gov.in", "Level 3 (Video Forensics Clearance)", "01-Dec-2022", None),
-            ("ADMIN", "scrb2026", "Commanding Officer (Admin)", "Chief of Police SCRB & Systems Administrator", "GP-HQ-0001", "State Police Headquarters", "DGP Command Control Enclave, Gandhinagar", "+91 79 23250000", "admin.scrb@gujarat.gov.in", "Level 5 (Supreme State Command Clearance)", "01-Jan-2018", None)
+            ("AAMIN", "1124", "Officer Aamin", "Senior Cyber Forensic Examiner & ANPR Grid Lead", "GP-SCRB-8842", "State Crime Record Bureau (SCRB)", "SCRB Cyber Command Grid, Gandhinagar", "+91 94280 11240", "aaminattari1124@gmail.com", "Level 4 (State Forensics Clearance)", "14-Feb-2021", None),
+            ("PRATHAM", "1111", "Officer Pratham", "Deputy Superintendent of Police (Cyber & ANPR Ops)", "GP-SCRB-9102", "Crime Branch Intelligence", "Crime Branch HQ, Ahmedabad", "+91 98250 11110", "aaminattari1124@gmail.com", "Level 4 (State Intelligence Clearance)", "10-Jan-2020", None),
+            ("PIYUSH", "2222", "Officer Piyush", "Inspector of Police (Highway Intercept Command)", "GP-SCRB-7341", "Highway Safety & Traffic Branch", "Vadodara Highway Command Center", "+91 98790 22220", "aaminattari1124@gmail.com", "Level 3 (Highway Intercept Clearance)", "15-Aug-2021", None),
+            ("HARSIL", "3333", "Officer Harsil", "Sub-Inspector & Video Forensics Specialist", "GP-SCRB-6250", "Forensic Science & Surveillance Wing", "Rajkot Zone Surveillance Hub", "+91 99090 33330", "aaminattari1124@gmail.com", "Level 3 (Video Forensics Clearance)", "01-Dec-2022", None),
+            ("ADMIN", "scrb2026", "Commanding Officer (Admin)", "Chief of Police SCRB & Systems Administrator", "GP-HQ-0001", "State Police Headquarters", "DGP Command Control Enclave, Gandhinagar", "+91 79 23250000", "aaminattari1124@gmail.com", "Level 5 (Supreme State Command Clearance)", "01-Jan-2018", None)
         ]
         
         for u in default_officers:
@@ -196,7 +196,7 @@ def load_saved_officer_profile():
         "dept": "State Crime Record Bureau (SCRB)",
         "station": "SCRB Cyber Command Grid, Gandhinagar",
         "phone": "+91 94280 11240",
-        "email": "aamin.scrb@gujarat.gov.in",
+        "email": "aaminattari1124@gmail.com",
         "clearance": "Level 4 (State Forensics Clearance)",
         "joining_date": "14-Feb-2021",
         "avatar_base64": None
