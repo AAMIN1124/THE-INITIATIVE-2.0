@@ -100,13 +100,21 @@ def init_sentinel_hls_proxy():
         req_login = urllib.request.Request(
             'https://cctv.corp8.cloud/auth/login',
             data=login_data,
-            headers={'User-Agent': 'Mozilla/5.0'}
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': 'https://cctv.corp8.cloud/auth/login'
+            }
         )
-        opener.open(req_login, timeout=5.0)
+        opener.open(req_login, timeout=8.0)
     except Exception:
         pass
 
     SENTINEL_SESSION_OPENER = opener
+
+    class ThreadingHLSProxyServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+        allow_reuse_address = True
+        daemon_threads = True
 
     class HLSProxyHandler(http.server.BaseHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -114,7 +122,7 @@ def init_sentinel_hls_proxy():
 
         def do_OPTIONS(self):
             self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Origin', '*'); self.send_header('Access-Control-Allow-Credentials', 'true')
             self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
             self.send_header('Access-Control-Allow-Headers', '*')
             self.end_headers()
@@ -125,29 +133,41 @@ def init_sentinel_hls_proxy():
             try:
                 req = urllib.request.Request(
                     remote_url,
-                    headers={'User-Agent': 'Mozilla/5.0', 'Referer': 'https://cctv.corp8.cloud/'}
+                    headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                        'Referer': 'https://cctv.corp8.cloud/'
+                    }
                 )
-                resp = SENTINEL_SESSION_OPENER.open(req, timeout=5.0)
+                resp = SENTINEL_SESSION_OPENER.open(req, timeout=8.0)
                 data = resp.read()
 
-                self.send_response(resp.status)
-                self.send_header('Access-Control-Allow-Origin', '*')
-                for k, v in resp.headers.items():
-                    if k.lower() in ['content-type', 'content-length']:
-                        self.send_header(k, v)
-                self.end_headers()
-                self.wfile.write(data)
-            except Exception as e:
-                self.send_response(500)
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(str(e).encode('utf-8'))
+                # Rewrite encryption key URI in m3u8 playlist to point locally
+                if path.endswith('.m3u8'):
+                    data = data.replace(b'URI="/enc.key"', f'URI="http://127.0.0.1:{PROXY_PORT}/enc.key"'.encode('utf-8'))
+                    data = data.replace(b'URI=\"/enc.key\"', f'URI=\"http://127.0.0.1:{PROXY_PORT}/enc.key\"'.encode('utf-8'))
 
-    class ReusableTCPServer(socketserver.TCPServer):
-        allow_reuse_address = True
+                self.send_response(resp.status)
+                self.send_header('Access-Control-Allow-Origin', '*'); self.send_header('Access-Control-Allow-Credentials', 'true')
+                for k, v in resp.headers.items():
+                    if k.lower() in ['content-type']:
+                        self.send_header(k, v)
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                try:
+                    self.wfile.write(data)
+                except Exception:
+                    pass
+            except Exception as e:
+                try:
+                    self.send_response(500)
+                    self.send_header('Access-Control-Allow-Origin', '*'); self.send_header('Access-Control-Allow-Credentials', 'true')
+                    self.end_headers()
+                    self.wfile.write(str(e).encode('utf-8'))
+                except Exception:
+                    pass
 
     try:
-        server = ReusableTCPServer(('127.0.0.1', PROXY_PORT), HLSProxyHandler)
+        server = ThreadingHLSProxyServer(('127.0.0.1', PROXY_PORT), HLSProxyHandler)
         t = threading.Thread(target=server.serve_forever, daemon=True)
         t.start()
         SENTINEL_PROXY_SERVER = server
@@ -155,6 +175,7 @@ def init_sentinel_hls_proxy():
         pass
 
 init_sentinel_hls_proxy()
+
 
 if "GLOBAL_SIGHTINGS_BUFFER" not in globals():
     GLOBAL_SIGHTINGS_BUFFER = []
@@ -665,10 +686,9 @@ def is_stream_server_alive(host="live.corp8.cloud", port=80, timeout_sec=0.35):
 
 def capture_live_frame_from_stream(cam_dict):
     """
-    Strict Live Frame Grabber (100% Real Stream Ingest - Zero Fallbacks).
-    Forces RTSP over TCP with Government Sentinel Pass Authentication.
+    Ultra-Fast Live Frame Grabber (Direct HLS Stream with Sub-Second Timeout).
+    Eliminates 30-second OpenCV timeouts and dropped frames.
     """
-    pass_token = "SYU2-RUFT-5N7B"
     if isinstance(cam_dict, dict):
         custom_url = cam_dict.get("custom_url", cam_dict.get("stream_url", "")).strip()
         st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "1")))
@@ -683,36 +703,21 @@ def capture_live_frame_from_stream(cam_dict):
     except Exception:
         pass
 
-    if "http" in st_id or "rtsp" in st_id:
-        custom_url = st_id
-
     clean_id = st_id.split("-")[-1] if "-" in st_id else st_id
     if clean_id.isdigit():
-        clean_id = str(int(clean_id))
-
-    pass_query = f"pass={pass_token}&token={pass_token}&auth={pass_token}"
+        cam_key = f"cam{int(clean_id):02d}"
+    elif clean_id.lower().startswith("cam"):
+        cam_key = clean_id.lower()
+    else:
+        cam_key = f"cam{clean_id}"
 
     if custom_url:
-        if "corp8.cloud" in custom_url and "pass=" not in custom_url:
-            sep = "&" if "?" in custom_url else "?"
-            custom_url = f"{custom_url}{sep}{pass_query}"
-        urls_to_try = [
-            custom_url,
-            custom_url.replace("https://", "http://"),
-            custom_url.replace("http://", "https://")
-        ]
-        target_host = urllib.parse.urlparse(custom_url).hostname or "live.corp8.cloud"
-        target_port = urllib.parse.urlparse(custom_url).port or (443 if "https" in custom_url else 80)
+        urls_to_try = [custom_url]
     else:
         urls_to_try = [
-            f"https://live.corp8.cloud/stream/{clean_id}?{pass_query}",
-            f"http://live.corp8.cloud/stream/{clean_id}?{pass_query}",
-            f"https://corp8.cloud/stream/{clean_id}?{pass_query}",
-            f"rtsp://admin:{pass_token}@live.corp8.cloud:8554/stream/{clean_id}",
-            f"https://live.corp8.cloud/stream/{clean_id}"
+            f"http://127.0.0.1:8505/{cam_key}/index.m3u8",
+            f"https://cctv.corp8.cloud/{cam_key}/index.m3u8"
         ]
-        target_host = "live.corp8.cloud"
-        target_port = 80
 
     os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1200"
 
@@ -722,7 +727,7 @@ def capture_live_frame_from_stream(cam_dict):
             if not cap.isOpened():
                 cap = cv2.VideoCapture(stream_url)
             if cap.isOpened():
-                for _ in range(4):
+                for _ in range(3):
                     ret, frame = cap.read()
                     if ret and frame is not None and frame.size > 0:
                         cap.release()
@@ -754,9 +759,9 @@ def capture_live_burst_frames(cam_dict, burst_count=5):
         clean_id = str(int(clean_id))
 
     target_urls = [custom_url] if custom_url else [
-        f"http://live.corp8.cloud/stream/{clean_id}",
-        f"https://live.corp8.cloud/stream/{clean_id}",
-        f"rtsp://live.corp8.cloud:8554/stream/{clean_id}"
+        
+        
+        f"http://127.0.0.1:8505/cam{int(clean_id):02d}/index.m3u8"
     ]
 
     target_host = urllib.parse.urlparse(custom_url).hostname or "live.corp8.cloud" if custom_url else "live.corp8.cloud"
@@ -3081,9 +3086,9 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo
         stream_urls_to_try = [
             cam_obj.get("custom_url", "").strip() if isinstance(cam_obj, dict) else "",
             get_active_stream_url(cam_obj),
-            f"http://live.corp8.cloud/stream/{clean_id}",
-            f"https://live.corp8.cloud/stream/{clean_id}",
-            f"rtsp://live.corp8.cloud:8554/stream/{clean_id}"
+            
+            
+            f"http://127.0.0.1:8505/cam{int(clean_id):02d}/index.m3u8"
         ]
         stream_urls_to_try = [u for u in stream_urls_to_try if u]
         
