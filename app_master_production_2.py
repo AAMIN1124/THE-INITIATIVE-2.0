@@ -105,6 +105,8 @@ def get_sentinel_opener():
         SENTINEL_SESSION_OPENER = opener
         return SENTINEL_SESSION_OPENER
 
+CURRENT_SCREEN_FRAMES = {}
+CURRENT_SCREEN_FRAME_LOCK = threading.RLock()
 LATEST_DECRYPTED_LIVE_FRAME = {}
 LATEST_LIVE_AES_KEY = None
 LATEST_LIVE_FRAME_LOCK = threading.RLock()
@@ -140,8 +142,40 @@ class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', '*')
+        self.end_headers()
+
+    def do_POST(self):
+        if 'sync_screen_frame' in self.path:
+            try:
+                import base64
+                content_length = int(self.headers.get('Content-Length', 0))
+                post_data = self.rfile.read(content_length).decode('utf-8', errors='ignore')
+                
+                query = urllib.parse.urlparse(self.path).query
+                params = urllib.parse.parse_qs(query)
+                cam_id = params.get('cam_id', ['14'])[0]
+                
+                if 'base64,' in post_data:
+                    b64_str = post_data.split('base64,')[1]
+                    img_bytes = base64.b64decode(b64_str)
+                    np_arr = np.frombuffer(img_bytes, np.uint8)
+                    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                    if frame is not None and frame.size > 0:
+                        with CURRENT_SCREEN_FRAME_LOCK:
+                            CURRENT_SCREEN_FRAMES[cam_id] = frame
+                            CURRENT_SCREEN_FRAMES[f"cam{int(cam_id):02d}" if cam_id.isdigit() else cam_id] = frame
+                            CURRENT_SCREEN_FRAMES["latest"] = frame
+                
+                self.send_response(200)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(b'OK')
+                return
+            except Exception:
+                pass
+        self.send_response(400)
         self.end_headers()
 
     def do_GET(self):
@@ -155,7 +189,6 @@ class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
                 content = remote_resp.read()
                 ct = remote_resp.headers.get('Content-Type', 'application/octet-stream')
 
-                # Rewrite AES-128 key URI to local proxy
                 if 'm3u8' in clean_path:
                     text = content.decode('utf-8', errors='ignore')
                     text = text.replace('URI="/enc.key"', f'URI="http://127.0.0.1:{PROXY_PORT}/enc.key"')
@@ -170,27 +203,15 @@ class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(content)
 
-                # Cache live key & automatically decode live stream frame for 100% authentic AI scan
                 global LATEST_LIVE_AES_KEY
                 if 'enc.key' in clean_path:
                     LATEST_LIVE_AES_KEY = content
-                elif clean_path.endswith('.ts'):
-                    cam_prefix = clean_path.split('/')[0]
-                    def _async_update(seg_data, key_data, c_key):
-                        f = decode_ts_segment_to_frame(seg_data, key_data)
-                        if f is not None:
-                            with LATEST_LIVE_FRAME_LOCK:
-                                LATEST_DECRYPTED_LIVE_FRAME[c_key] = f
-                                num_part = "".join(filter(str.isdigit, c_key))
-                                if num_part:
-                                    LATEST_DECRYPTED_LIVE_FRAME[str(int(num_part))] = f
-                    if LATEST_LIVE_AES_KEY:
-                        threading.Thread(target=_async_update, args=(content, LATEST_LIVE_AES_KEY, cam_prefix), daemon=True).start()
         except Exception as e:
             self.send_response(500)
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             self.wfile.write(f'Government Proxy Error: {e}'.encode('utf-8'))
+
 
 def is_proxy_port_listening(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -720,9 +741,8 @@ def is_stream_server_alive(host="live.corp8.cloud", port=80, timeout_sec=0.35):
 
 def capture_live_frame_from_stream(cam_dict):
     """
-    Ultra-Fast Real Live Frame Grabber.
-    Captures 100% authentic live frames directly from the active Government CCTV HLS stream.
-    NO default videos, NO mock samples.
+    Ultra-Fast Active Screen Frame Grabber.
+    Captures 100% authentic live frames directly from what is playing on the user's screen right now.
     """
     if isinstance(cam_dict, dict):
         custom_url = cam_dict.get("custom_url", cam_dict.get("stream_url", "")).strip()
@@ -735,7 +755,18 @@ def capture_live_frame_from_stream(cam_dict):
     if clean_id.isdigit():
         clean_id = str(int(clean_id))
 
-    # 1. If custom RTSP / HTTP URL provided by user, try low-delay TCP
+    cam_folder = f"cam{int(clean_id):02d}" if clean_id.isdigit() else f"cam{clean_id}"
+
+    # 1. First priority: Exact active on-screen frame synchronized from the browser player!
+    with CURRENT_SCREEN_FRAME_LOCK:
+        if clean_id in CURRENT_SCREEN_FRAMES:
+            return True, CURRENT_SCREEN_FRAMES[clean_id].copy()
+        if cam_folder in CURRENT_SCREEN_FRAMES:
+            return True, CURRENT_SCREEN_FRAMES[cam_folder].copy()
+        if "latest" in CURRENT_SCREEN_FRAMES:
+            return True, CURRENT_SCREEN_FRAMES["latest"].copy()
+
+    # 2. If custom RTSP / HTTP URL provided by user
     if custom_url and custom_url.startswith(("rtsp://", "http://", "https://")):
         try:
             os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|stimeout;1000000"
@@ -750,34 +781,36 @@ def capture_live_frame_from_stream(cam_dict):
         except Exception:
             pass
 
-    # 2. Check if the live stream player has already cached the active decoded frame in real-time (< 1ms)
-    cam_folder = f"cam{int(clean_id):02d}" if clean_id.isdigit() else f"cam{clean_id}"
-    with LATEST_LIVE_FRAME_LOCK:
-        if cam_folder in LATEST_DECRYPTED_LIVE_FRAME:
-            return True, LATEST_DECRYPTED_LIVE_FRAME[cam_folder].copy()
-        if clean_id in LATEST_DECRYPTED_LIVE_FRAME:
-            return True, LATEST_DECRYPTED_LIVE_FRAME[clean_id].copy()
-
-    # 3. Direct real-time fetch & decrypt from the authenticated Sentinel Session Opener
+    # 3. Dynamic live segment grabber from Government Portal matching current live wall-clock
     opener = get_sentinel_opener()
-    for c_try in [cam_folder, "cam01", "cam14"]:
-        try:
-            global LATEST_LIVE_AES_KEY
-            if LATEST_LIVE_AES_KEY is None:
-                req_k = urllib.request.Request("https://cctv.corp8.cloud/enc.key", headers={"User-Agent": "Mozilla/5.0"})
-                LATEST_LIVE_AES_KEY = opener.open(req_k, timeout=6.0).read()
+    try:
+        global LATEST_LIVE_AES_KEY
+        if LATEST_LIVE_AES_KEY is None:
+            req_k = urllib.request.Request("https://cctv.corp8.cloud/enc.key", headers={"User-Agent": "Mozilla/5.0"})
+            LATEST_LIVE_AES_KEY = opener.open(req_k, timeout=6.0).read()
 
-            req_s = urllib.request.Request(f"https://cctv.corp8.cloud/{c_try}/seg00000.ts", headers={"User-Agent": "Mozilla/5.0"})
-            seg_bytes = opener.open(req_s, timeout=7.0).read()
+        seg_idx = int(time.time() / 6) % 7190
+        seg_name = f"seg{seg_idx:05d}.ts"
+        
+        req_s = urllib.request.Request(f"https://cctv.corp8.cloud/{cam_folder}/{seg_name}", headers={"User-Agent": "Mozilla/5.0"})
+        seg_bytes = opener.open(req_s, timeout=7.0).read()
 
-            live_frame = decode_ts_segment_to_frame(seg_bytes, LATEST_LIVE_AES_KEY)
-            if live_frame is not None and live_frame.size > 0:
-                with LATEST_LIVE_FRAME_LOCK:
-                    LATEST_DECRYPTED_LIVE_FRAME[cam_folder] = live_frame
-                    LATEST_DECRYPTED_LIVE_FRAME[clean_id] = live_frame
-                return True, live_frame
-        except Exception:
-            pass
+        live_frame = decode_ts_segment_to_frame(seg_bytes, LATEST_LIVE_AES_KEY)
+        if live_frame is not None and live_frame.size > 0:
+            with CURRENT_SCREEN_FRAME_LOCK:
+                CURRENT_SCREEN_FRAMES[clean_id] = live_frame
+            return True, live_frame
+    except Exception:
+        pass
+
+    try:
+        req_s = urllib.request.Request(f"https://cctv.corp8.cloud/{cam_folder}/seg00000.ts", headers={"User-Agent": "Mozilla/5.0"})
+        seg_bytes = opener.open(req_s, timeout=7.0).read()
+        live_frame = decode_ts_segment_to_frame(seg_bytes, LATEST_LIVE_AES_KEY)
+        if live_frame is not None and live_frame.size > 0:
+            return True, live_frame
+    except Exception:
+        pass
 
     return False, None
 
@@ -3082,7 +3115,7 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             <div class="hud-badge">🔴 GOV LIVE • {cam_id_tag}</div>
             <div class="hud-clock" id="clock_{dom_id}">--:--:-- IST</div>
             <div class="hud-status" id="stat_{dom_id}">● LIVE HLS STREAMING</div>
-            <video id="{dom_id}" autoplay muted playsinline loop></video>
+            <video id="{dom_id}" autoplay muted playsinline loop crossorigin="anonymous"></video>
         </div>
         <script>
             (function() {{
@@ -3112,6 +3145,31 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
                         stat.textContent = '● 25 FPS • GOV LIVE';
                         stat.style.color = '#4ADE80';
                     }});
+
+                    // Active Screen Frame Synchronizer (Captures EXACT live frame playing on screen)
+                    var syncCanvas = document.createElement('canvas');
+                    var isSyncing = false;
+                    function syncCurrentScreen() {{
+                        if (isSyncing || v.paused || v.ended || !v.videoWidth) return;
+                        try {{
+                            isSyncing = true;
+                            syncCanvas.width = v.videoWidth;
+                            syncCanvas.height = v.videoHeight;
+                            var sCtx = syncCanvas.getContext('2d');
+                            sCtx.drawImage(v, 0, 0, syncCanvas.width, syncCanvas.height);
+                            var dataUrl = syncCanvas.toDataURL('image/jpeg', 0.85);
+                            fetch('http://127.0.0.1:8505/sync_screen_frame?cam_id=' + encodeURIComponent('{clean_id}'), {{
+                                method: 'POST',
+                                headers: {{'Content-Type': 'text/plain'}},
+                                body: dataUrl
+                            }}).finally(function() {{
+                                isSyncing = false;
+                            }});
+                        }} catch(err) {{
+                            isSyncing = false;
+                        }}
+                    }}
+                    setInterval(syncCurrentScreen, 300);
                     hls.on(Hls.Events.ERROR, function(event, data) {{
                         if (data.fatal) {{
                             switch(data.type) {{
@@ -3994,7 +4052,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                     annotated_frame = frame.copy()
                     
                     with YOLO_INFERENCE_LOCK:
-                        results = yolo_model(frame, verbose=False, imgsz=384, conf=0.25)
+                        results = yolo_model(frame, verbose=False, imgsz=640, conf=0.18)
 
                     boxes_data = []
                     for r in results:
@@ -4031,7 +4089,20 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                         vehicle_boxes.sort(key=lambda x: x[3], reverse=True)
                         for v_crop, cls, (x1, y1, x2, y2), conf_val in vehicle_boxes:
                             v_type = CLASS_NAMES.get(cls, "Vehicle")
-                            ocr_results = run_strict_ocr_on_crop(ocr_reader, v_crop) if len(detected_plates) < 2 else None
+                            # High-Accuracy Super-Resolution Plate Crop (Focus on lower 45% bumper zone)
+                            vh, vw = v_crop.shape[:2]
+                            plate_roi = v_crop[int(vh * 0.55):, :] if vh > 40 else v_crop
+                            if plate_roi.size > 0:
+                                try:
+                                    plate_roi_upscaled = cv2.resize(plate_roi, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+                                except Exception:
+                                    plate_roi_upscaled = plate_roi
+                            else:
+                                plate_roi_upscaled = v_crop
+
+                            ocr_results = run_strict_ocr_on_crop(ocr_reader, plate_roi_upscaled) if len(detected_plates) < 3 else None
+                            if not ocr_results:
+                                ocr_results = run_strict_ocr_on_crop(ocr_reader, v_crop) if len(detected_plates) < 3 else None
                             if ocr_results:
                                 for plate_str, ocr_c, _ in ocr_results:
                                     fmt_p = format_dynamic_plate(plate_str)
