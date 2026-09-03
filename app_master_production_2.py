@@ -2858,7 +2858,8 @@ def render_cctv_live_container(cam_obj, height=480, border_color="rgba(134,239,1
     cam_target_id = f"cam{cam_num}"
     cam_name = cam_dict.get("name", f"Checkpost {clean_id}")
 
-    # Embed the genuine Government Sentinel Live Surveillance Portal
+    dom_id = f"sentinel_box_{clean_id}"
+
     player_html = f"""
     <!DOCTYPE html>
     <html>
@@ -2866,8 +2867,8 @@ def render_cctv_live_container(cam_obj, height=480, border_color="rgba(134,239,1
         <meta charset="utf-8">
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-            body {{ background: #050B18; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }}
-            .portal-container {{
+            body {{ background: #050B18; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, monospace; }}
+            .wrapper {{
                 position: relative;
                 width: 100%;
                 height: {height}px;
@@ -2877,92 +2878,96 @@ def render_cctv_live_container(cam_obj, height=480, border_color="rgba(134,239,1
                 overflow: hidden;
                 box-shadow: 0 8px 32px rgba(0,0,0,0.6);
             }}
-            .top-bar {{
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 42px;
+            .hud-bar {{
+                height: 44px;
                 background: rgba(15, 23, 42, 0.95);
-                backdrop-filter: blur(10px);
                 border-bottom: 1px solid rgba(56, 189, 248, 0.3);
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                padding: 0 14px;
-                z-index: 20;
+                padding: 0 16px;
             }}
-            .badge-live {{
+            .live-tag {{
                 background: #DC2626;
                 color: #FFFFFF;
                 font-size: 11px;
                 font-weight: 800;
-                padding: 3px 8px;
-                border-radius: 5px;
+                padding: 3px 10px;
+                border-radius: 6px;
                 letter-spacing: 0.5px;
                 display: flex;
                 align-items: center;
-                gap: 5px;
+                gap: 6px;
             }}
-            .badge-live::before {{
+            .live-tag::before {{
                 content: "";
-                display: inline-block;
-                width: 7px;
-                height: 7px;
+                width: 8px;
+                height: 8px;
                 background: #FFFFFF;
                 border-radius: 50%;
-                animation: pulse 1.5s infinite;
+                animation: pulse 1.2s infinite;
             }}
             @keyframes pulse {{
                 0% {{ opacity: 1; transform: scale(1); }}
-                50% {{ opacity: 0.4; transform: scale(0.8); }}
+                50% {{ opacity: 0.3; transform: scale(0.7); }}
                 100% {{ opacity: 1; transform: scale(1); }}
             }}
-            .cam-title {{
+            .title {{
                 color: #F8FAFC;
-                font-size: 12.5px;
+                font-size: 13px;
                 font-weight: 700;
-                letter-spacing: -0.2px;
             }}
-            .portal-link {{
+            .btn-direct {{
+                background: rgba(56, 189, 248, 0.15);
                 color: #38BDF8;
+                border: 1px solid rgba(56, 189, 248, 0.4);
                 font-size: 11.5px;
                 font-weight: 700;
-                text-decoration: none;
-                background: rgba(56, 189, 248, 0.12);
-                border: 1px solid rgba(56, 189, 248, 0.35);
-                padding: 4px 10px;
+                padding: 5px 12px;
                 border-radius: 6px;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
                 transition: all 0.2s;
             }}
-            .portal-link:hover {{
-                background: rgba(56, 189, 248, 0.25);
+            .btn-direct:hover {{
+                background: rgba(56, 189, 248, 0.3);
                 color: #FFFFFF;
             }}
             iframe {{
-                position: absolute;
-                top: 42px;
-                left: 0;
                 width: 100%;
-                height: calc(100% - 42px);
+                height: calc(100% - 44px);
                 border: none;
-                background: #020617;
+                background: #0A0E14;
             }}
         </style>
     </head>
     <body>
-        <div class="portal-container">
-            <div class="top-bar">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span class="badge-live">GOV LIVE</span>
-                    <span class="cam-title">🏛️ GUJARAT POLICE SENTINEL • TARGET: {cam_id_tag} ({cam_target_id.upper()})</span>
+        <div class="wrapper">
+            <div class="hud-bar">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span class="live-tag">GOV LIVE</span>
+                    <span class="title">🏛️ GUJARAT POLICE SENTINEL • TARGET: {cam_id_tag}</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <a class="portal-link" href="https://cctv.corp8.cloud" target="_blank">↗ Fullscreen Sentinel Control Room</a>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <a class="btn-direct" href="https://cctv.corp8.cloud" target="_blank">↗ FULL 30-CAMERA GRID</a>
                 </div>
             </div>
-            <iframe id="sentinel_frame" src="https://cctv.corp8.cloud" allow="autoplay; fullscreen; clipboard-write; encrypted-media" allowfullscreen></iframe>
+            <form id="sentinel_form_{dom_id}" method="POST" action="https://cctv.corp8.cloud/auth/login" target="frame_{dom_id}" style="display:none;">
+                <input type="hidden" name="email" value="aaminattari1124@gmail.com">
+                <input type="hidden" name="password" value="SYU2-RUFT-5N7B">
+            </form>
+            <iframe name="frame_{dom_id}" id="frame_{dom_id}" src="about:blank" allow="autoplay; fullscreen; clipboard-write" allowfullscreen></iframe>
         </div>
+        <script>
+            setTimeout(function() {{
+                var form = document.getElementById('sentinel_form_{dom_id}');
+                if (form) {{
+                    form.submit();
+                }}
+            }}, 50);
+        </script>
     </body>
     </html>
     """
