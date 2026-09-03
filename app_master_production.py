@@ -60,34 +60,29 @@ st.set_page_config(
 
 # ----------------- GLOBAL THREAD-SAFE INGEST BUFFER & WORKER REGISTRY -----------------
 # ----------------- AUTHENTICATED LOCAL HLS STREAM PROXY -----------------
-# Eliminates Browser CORS & Third-Party Cookie Blocks on cctv.corp8.cloud
-import http.server
-import socketserver
-import http.cookiejar
-import ssl
-
-try:
-    cv2.setLogLevel(0)
-except Exception:
-    pass
-os.environ["OPENCV_LOG_LEVEL"] = "FATAL"
-os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
-
 try:
     from streamlit.runtime.scriptrunner import add_script_run_ctx
 except Exception:
     add_script_run_ctx = None
 
 PROXY_PORT = 8505
-SENTINEL_SESSION_OPENER = None
+SENTINEL_ACCESS_PASSWORD = "SYU2-RUFT-5N7B"
 SENTINEL_PROXY_SERVER = None
+SENTINEL_SESSION_OPENER = None
 
 def init_sentinel_hls_proxy():
-    global SENTINEL_SESSION_OPENER, SENTINEL_PROXY_SERVER
+    global SENTINEL_PROXY_SERVER, SENTINEL_SESSION_OPENER
     if SENTINEL_PROXY_SERVER is not None:
         return
-        
-    pass_token = "SYU2-RUFT-5N7B"
+
+    import http.server
+    import socketserver
+    import urllib.request
+    import urllib.parse
+    import http.cookiejar
+    import ssl
+    import threading
+
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -96,17 +91,17 @@ def init_sentinel_hls_proxy():
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj), urllib.request.HTTPSHandler(context=ctx))
 
     try:
-        login_data = urllib.parse.urlencode({'email': 'aaminattari1124@gmail.com', 'password': pass_token}).encode('utf-8')
+        login_data = urllib.parse.urlencode({'email': 'aaminattari1124@gmail.com', 'password': SENTINEL_ACCESS_PASSWORD}).encode('utf-8')
         req_login = urllib.request.Request(
             'https://cctv.corp8.cloud/auth/login',
             data=login_data,
             headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Referer': 'https://cctv.corp8.cloud/auth/login'
             }
         )
-        opener.open(req_login, timeout=8.0)
+        opener.open(req_login, timeout=5.0)
     except Exception:
         pass
 
@@ -122,52 +117,83 @@ def init_sentinel_hls_proxy():
 
         def do_OPTIONS(self):
             self.send_response(200)
-            origin = self.headers.get('Origin', '*')
-            self.send_header('Access-Control-Allow-Origin', origin)
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS, HEAD')
             self.send_header('Access-Control-Allow-Headers', '*')
-            self.send_header('Access-Control-Max-Age', '86400')
             self.end_headers()
 
         def do_GET(self):
             path = self.path.lstrip('/')
-            remote_url = f"https://cctv.corp8.cloud/{path}"
-            try:
-                req = urllib.request.Request(
-                    remote_url,
-                    headers={
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                        'Referer': 'https://cctv.corp8.cloud/'
-                    }
-                )
-                resp = SENTINEL_SESSION_OPENER.open(req, timeout=8.0)
-                data = resp.read()
+            clean_path = path.split('?')[0]
 
-                # Rewrite encryption key URI in m3u8 playlist to point locally
-                if path.endswith('.m3u8'):
+            candidate_urls = [
+                f"https://cctv.corp8.cloud/{clean_path}",
+                f"https://live.corp8.cloud/{clean_path}",
+                f"https://live.corp8.cloud/live/{clean_path}",
+                f"http://live.corp8.cloud:8889/{clean_path}"
+            ]
+            
+            if "cam" in clean_path and "index.m3u8" in clean_path:
+                cam_num = "".join(filter(str.isdigit, clean_path.split('/')[0]))
+                if cam_num:
+                    int_id = str(int(cam_num))
+                    candidate_urls.insert(0, f"https://cctv.corp8.cloud/cam{int(int_id):02d}/index.m3u8")
+                    candidate_urls.insert(1, f"https://live.corp8.cloud/live/stream/{int_id}/")
+
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'X-Access-Password': SENTINEL_ACCESS_PASSWORD,
+                'Authorization': f'Bearer {SENTINEL_ACCESS_PASSWORD}',
+                'Cookie': f'token={SENTINEL_ACCESS_PASSWORD}; password={SENTINEL_ACCESS_PASSWORD}; access_password={SENTINEL_ACCESS_PASSWORD}',
+                'Referer': 'https://cctv.corp8.cloud/'
+            }
+
+            data = None
+            content_type = 'application/vnd.apple.mpegurl' if clean_path.endswith('.m3u8') else 'video/MP2T'
+            status_code = 500
+            last_err = ""
+
+            for target_url in candidate_urls:
+                try:
+                    req = urllib.request.Request(target_url, headers=headers)
+                    if SENTINEL_SESSION_OPENER is not None:
+                        try:
+                            resp = SENTINEL_SESSION_OPENER.open(req, timeout=6.0)
+                            data = resp.read()
+                            status_code = resp.status
+                            content_type = resp.headers.get('Content-Type', content_type)
+                            break
+                        except Exception:
+                            pass
+                    with urllib.request.urlopen(req, timeout=6.0, context=ctx) as resp:
+                        data = resp.read()
+                        status_code = resp.status
+                        content_type = resp.headers.get('Content-Type', content_type)
+                        break
+                except Exception as ex:
+                    last_err = str(ex)
+                    continue
+
+            if data is not None:
+                if clean_path.endswith('.m3u8'):
                     data = data.replace(b'URI="/enc.key"', f'URI="http://127.0.0.1:{PROXY_PORT}/enc.key"'.encode('utf-8'))
                     data = data.replace(b'URI=\"/enc.key\"', f'URI=\"http://127.0.0.1:{PROXY_PORT}/enc.key\"'.encode('utf-8'))
 
-                self.send_response(resp.status)
-                origin = self.headers.get('Origin', '*')
-                self.send_header('Access-Control-Allow-Origin', origin)
-                for k, v in resp.headers.items():
-                    if k.lower() in ['content-type']:
-                        self.send_header(k, v)
+                self.send_response(200)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+                self.send_header('Content-Type', content_type)
                 self.send_header('Content-Length', str(len(data)))
                 self.end_headers()
                 try:
                     self.wfile.write(data)
                 except Exception:
                     pass
-            except Exception as e:
-                try:
-                    self.send_response(500)
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.end_headers()
-                    self.wfile.write(str(e).encode('utf-8'))
-                except Exception:
-                    pass
+            else:
+                self.send_response(502)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(f"Upstream stream error: {last_err}".encode('utf-8'))
 
     try:
         server = ThreadingHLSProxyServer(('127.0.0.1', PROXY_PORT), HLSProxyHandler)
@@ -178,7 +204,6 @@ def init_sentinel_hls_proxy():
         pass
 
 init_sentinel_hls_proxy()
-
 
 if "GLOBAL_SIGHTINGS_BUFFER" not in globals():
     GLOBAL_SIGHTINGS_BUFFER = []
