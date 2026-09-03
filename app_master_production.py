@@ -2972,86 +2972,77 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         clean_id = str(int(clean_id))
     cam_id_tag = cam_dict.get("cam_id", f"CAM-{clean_id}")
     
-    # Official Endpoints
-    primary_stream = f"https://live.corp8.cloud/live/stream/{clean_id}/"
-    fallback_stream = f"https://live.corp8.cloud/stream/{clean_id}"
-    proxy_stream = f"http://127.0.0.1:8505/cam{int(clean_id):02d}/index.m3u8" if clean_id.isdigit() else f"http://127.0.0.1:8505/cam{clean_id}/index.m3u8"
-    
+    # Official challenge browser playback endpoint (direct media range stream)
+    custom_url = cam_dict.get("custom_url", "").strip() if isinstance(cam_dict, dict) else ""
+    stream_url = custom_url if custom_url else f"https://live.corp8.cloud/stream/{clean_id}"
     dom_id = f"vid_feed_{clean_id}"
 
+    # Pure HTML5 native video tag without hls.js (bypasses browser CORS XMLHttpRequest block)
     player_html = f"""
-    <div style="position: relative; width: 100%; height: {height}px; background: #000000; border-radius: 14px; border: 2px solid {border_color}; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,0.35);">
-        <div style="position: absolute; top: 10px; left: 10px; background: rgba(220, 38, 38, 0.95); color: #FFFFFF; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; z-index: 10; font-family: monospace; letter-spacing: 0.5px;">
-            🔴 LIVE • {cam_id_tag}
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{ background: #050B18; overflow: hidden; }}
+            .cctv-box {{
+                position: relative;
+                width: 100%;
+                height: {height}px;
+                background: #000000;
+                border-radius: 14px;
+                border: 2px solid {border_color};
+                overflow: hidden;
+                box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+            }}
+            .cctv-badge {{
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                background: rgba(220, 38, 38, 0.95);
+                color: #FFFFFF;
+                padding: 4px 10px;
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: 800;
+                z-index: 10;
+                font-family: monospace;
+            }}
+            .cctv-status {{
+                position: absolute;
+                bottom: 8px;
+                right: 10px;
+                color: #4ADE80;
+                font-size: 11px;
+                font-family: monospace;
+                z-index: 10;
+                background: rgba(0,0,0,0.6);
+                padding: 2px 8px;
+                border-radius: 4px;
+            }}
+            video {{
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="cctv-box">
+            <div class="cctv-badge">🔴 LIVE • {cam_id_tag}</div>
+            <div class="cctv-status" id="stat_{dom_id}">● STREAMING</div>
+            <video id="{dom_id}" src="{stream_url}" autoplay muted playsinline controls preload="auto" loop></video>
         </div>
-        <div id="status_{dom_id}" style="position: absolute; bottom: 8px; right: 10px; color: #38BDF8; font-size: 11px; font-family: monospace; z-index: 10; background: rgba(0,0,0,0.6); padding: 2px 8px; border-radius: 4px;">
-            Connecting...
-        </div>
-        <video id="{dom_id}" style="width: 100%; height: 100%; object-fit: cover;" autoplay muted playsinline controls preload="auto" loop></video>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script>
-        (function() {{
-            var video = document.getElementById('{dom_id}');
-            var status = document.getElementById('status_{dom_id}');
-            var urls = ['{primary_stream}', '{fallback_stream}', '{proxy_stream}'];
-            var currentIdx = 0;
-
-            function playDirect(url) {{
-                video.src = url;
-                video.muted = true;
-                var playPromise = video.play();
-                if (playPromise !== undefined) {{
-                    playPromise.then(function() {{
-                        status.textContent = "🟢 LIVE STREAM";
-                        status.style.color = "#4ADE80";
-                    }}).catch(function(err) {{
-                        playHls(url);
-                    }});
-                }}
-            }}
-
-            function playHls(url) {{
-                if (window.Hls && Hls.isSupported()) {{
-                    var hls = new Hls({{
-                        enableWorker: true,
-                        lowLatencyMode: true,
-                        backBufferLength: 15
-                    }});
-                    hls.loadSource(url);
-                    hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, function() {{
-                        video.muted = true;
-                        video.play().catch(function(){{}});
-                        status.textContent = "🟢 LIVE (HLS)";
-                        status.style.color = "#4ADE80";
-                    }});
-                    hls.on(Hls.Events.ERROR, function(event, data) {{
-                        if (data.fatal && currentIdx < urls.length - 1) {{
-                            hls.destroy();
-                            currentIdx++;
-                            tryNextUrl();
-                        }}
-                    }});
-                }} else if (currentIdx < urls.length - 1) {{
-                    currentIdx++;
-                    tryNextUrl();
-                }}
-            }}
-
-            function tryNextUrl() {{
-                var target = urls[currentIdx];
-                status.textContent = "Connecting (Node " + (currentIdx + 1) + ")...";
-                if (target.indexOf('.m3u8') !== -1) {{
-                    playHls(target);
-                }} else {{
-                    playDirect(target);
-                }}
-            }}
-
-            setTimeout(tryNextUrl, {stagger_ms});
-        }})();
-    </script>
+        <script>
+            (function() {{
+                var v = document.getElementById('{dom_id}');
+                v.muted = true;
+                v.play().catch(function() {{}});
+            }})();
+        </script>
+    </body>
+    </html>
     """
     components.html(player_html, height=height + 15, scrolling=False)
 
