@@ -70,6 +70,27 @@ import time
 import cv2
 import numpy as np
 
+if "GLOBAL_SIGHTINGS_BUFFER" not in globals():
+    GLOBAL_SIGHTINGS_BUFFER = []
+if "GLOBAL_SIGHTINGS_LOCK" not in globals():
+    GLOBAL_SIGHTINGS_LOCK = threading.RLock()
+
+# Granular Decoupled & Unified Thread-Safe Inference Locks
+if "UNIFIED_AI_LOCK" not in globals():
+    UNIFIED_AI_LOCK = threading.RLock()
+if "YOLO_INFERENCE_LOCK" not in globals():
+    YOLO_INFERENCE_LOCK = UNIFIED_AI_LOCK
+if "OCR_INFERENCE_LOCK" not in globals():
+    OCR_INFERENCE_LOCK = UNIFIED_AI_LOCK
+
+if "DAEMON_REGISTRY_LOCK" not in globals():
+    DAEMON_REGISTRY_LOCK = threading.RLock()
+if "ACTIVE_DAEMON_THREADS" not in globals():
+    ACTIVE_DAEMON_THREADS = {}
+if "DAEMON_STOP_EVENTS" not in globals():
+    DAEMON_STOP_EVENTS = {}
+MAX_CONCURRENT_DAEMONS = 2
+
 # ----------------- EMBEDDED SQLITE DATABASE & PROFILE PERSISTENCE LAYER -----------------
 import base64
 import sqlite3
