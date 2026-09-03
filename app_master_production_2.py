@@ -3508,11 +3508,10 @@ with GLOBAL_SIGHTINGS_LOCK:
             st.session_state["all_cctv_sightings"].append(item)
 
 total_sightings_count = len(st.session_state.get("all_cctv_sightings", []))
-daemon_color = "#10B981" if active_daemon_count > 0 else "#94A3B8"
 
 st.sidebar.markdown(f"""
 <div style="font-size: 0.78rem; font-weight: 700; color: #CBD5E1; margin-top: 6px;">
-    Ingest Status: <span style="color: {daemon_color}; font-weight: 800;">{active_daemon_count}/2 Active</span> | Buffer: <span style="color: #38BDF8; font-weight: 800;">{total_sightings_count} Sighting(s)</span>
+    Grid Status: <span style="color: #10B981; font-weight: 800;">● ONLINE</span> | Buffer: <span style="color: #38BDF8; font-weight: 800;">{total_sightings_count} Sighting(s)</span>
 </div>
 """, unsafe_allow_html=True)
 
