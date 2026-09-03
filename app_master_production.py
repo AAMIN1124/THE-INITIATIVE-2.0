@@ -2805,27 +2805,19 @@ def classify_rider_helmet(head_crop):
 # ----------------- 100% GENUINE LIVE CCTV STREAM RENDERING ENGINE -----------------
 def get_active_stream_url(identifier):
     """
-    Safely retrieves the active stream URL for dict, string, int, or custom IP streams.
-    Appends the Government Sentinel Access Password (SYU2-RUFT-5N7B) for direct authenticated access.
+    Safely retrieves the active HLS / RTSP / MP4 stream URL for cctv.corp8.cloud.
     """
     pass_token = "SYU2-RUFT-5N7B"
     if not identifier:
-        return f"https://live.corp8.cloud/stream/14?pass={pass_token}&token={pass_token}&auth={pass_token}"
+        return "https://cctv.corp8.cloud/cam14/index.m3u8"
         
     if isinstance(identifier, dict):
         if identifier.get("custom_url"):
-            u = str(identifier["custom_url"]).strip()
-            if "corp8.cloud" in u and "pass=" not in u:
-                sep = "&" if "?" in u else "?"
-                return f"{u}{sep}pass={pass_token}&token={pass_token}&auth={pass_token}"
-            return u
+            return str(identifier["custom_url"]).strip()
         st_id = str(identifier.get("stream_id", identifier.get("cam_id", identifier.get("camera_id", "14"))))
     else:
         st_id = str(identifier).strip()
         if st_id.startswith(("http://", "https://", "rtsp://", "rtsps://")):
-            if "corp8.cloud" in st_id and "pass=" not in st_id:
-                sep = "&" if "?" in st_id else "?"
-                return f"{st_id}{sep}pass={pass_token}&token={pass_token}&auth={pass_token}"
             return st_id
 
     if "-" in st_id and not st_id.startswith("JURY"):
@@ -2837,24 +2829,23 @@ def get_active_stream_url(identifier):
         overrides = {}
         
     if st_id in overrides and str(overrides[st_id]).strip():
-        u = str(overrides[st_id]).strip()
-        if "corp8.cloud" in u and "pass=" not in u:
-            sep = "&" if "?" in u else "?"
-            return f"{u}{sep}pass={pass_token}&token={pass_token}&auth={pass_token}"
-        return u
+        return str(overrides[st_id]).strip()
     if st_id.startswith("JURY") and st_id in overrides:
         return str(overrides[st_id]).strip()
     if st_id == "JURY" and "JURY" in overrides:
         return str(overrides["JURY"]).strip()
     
-    clean_num = str(int(st_id)) if st_id.isdigit() else st_id
-    return f"https://live.corp8.cloud/stream/{clean_num}?pass={pass_token}&token={pass_token}&auth={pass_token}"
+    if st_id.isdigit():
+        cam_key = f"cam{int(st_id):02d}"
+    elif st_id.lower().startswith("cam"):
+        cam_key = st_id.lower()
+    else:
+        cam_key = f"cam{st_id}"
+        
+    return f"https://cctv.corp8.cloud/{cam_key}/index.m3u8"
+
 
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
-    """
-    Pure Direct Live Stream HTML5 Player (Zero Fallbacks).
-    Streams live RTSP/HLS/HTTP endpoints directly to the UI.
-    """
     if isinstance(cam_obj, dict):
         cam_dict = cam_obj
         st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "14")))
@@ -2880,6 +2871,7 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 <html>
 <head>
 <meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{ background: transparent; overflow: hidden; }}
@@ -2889,28 +2881,62 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 </head>
 <body>
 <div class="vid-box">
-    <video id="{dom_id}" autoplay muted playsinline controls preload="auto" loop src="{video_src}"></video>
+    <video id="{dom_id}" autoplay muted playsinline controls preload="auto" loop></video>
     {badge_html}
 </div>
 <script>
     (function() {{
-        var v = document.getElementById('{dom_id}');
+        var video = document.getElementById('{dom_id}');
+        var src = '{video_src}';
         var delay = {stagger_ms};
-        function start() {{
-            try {{
-                v.muted = true;
-                v.play().catch(function(){{}});
-            }} catch(e) {{}}
+
+        function startStream() {{
+            if (src.indexOf('.m3u8') !== -1) {{
+                if (window.Hls && Hls.isSupported()) {{
+                    var hls = new Hls({{
+                        xhrSetup: function(xhr, url) {{ xhr.withCredentials = true; }},
+                        maxBufferLength: 8,
+                        maxMaxBufferLength: 16
+                    }});
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MEDIA_ATTACHED, function() {{
+                        hls.loadSource(src);
+                    }});
+                    hls.on(Hls.Events.MANIFEST_PARSED, function() {{
+                        video.muted = true;
+                        video.play().catch(function(){{}});
+                    }});
+                    hls.on(Hls.Events.ERROR, function(e, data) {{
+                        if (data.fatal) {{
+                            if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {{
+                                try {{ hls.recoverMediaError(); }} catch(err) {{}}
+                            }} else {{
+                                setTimeout(function() {{ try {{ hls.startLoad(); }} catch(err) {{}} }}, 2000);
+                            }}
+                        }}
+                    }});
+                }} else if (video.canPlayType('application/vnd.apple.mpegurl')) {{
+                    video.src = src;
+                    video.muted = true;
+                    video.play().catch(function(){{}});
+                }}
+            }} else {{
+                video.src = src;
+                video.muted = true;
+                video.play().catch(function(){{}});
+            }}
         }}
+
         if (delay > 0) {{
-            setTimeout(start, delay);
+            setTimeout(startStream, delay);
         }} else {{
-            start();
+            startStream();
         }}
     }})();
 </script>
 </body>
 </html>'''
+
     try:
         components.html(full_html, height=height + 15)
     except Exception:
