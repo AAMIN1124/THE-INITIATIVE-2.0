@@ -2976,7 +2976,7 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 <html>
 <head>
 <meta charset="utf-8">
-<script src="http://127.0.0.1:8505/hls.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{ background: transparent; overflow: hidden; }}
@@ -2998,12 +2998,6 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         var src = '{video_src}';
         var delay = {stagger_ms};
 
-        function livePos(v) {{
-            if (v.duration && isFinite(v.duration) && v.duration > 1) {{
-                try {{ v.currentTime = (Date.now() / 1000) % v.duration; }} catch(e) {{}}
-            }}
-        }}
-
         function updateClock() {{
             var d = new Date(Date.now() + 19800000);
             function pad(n) {{ return String(n).padStart(2, '0'); }}
@@ -3016,20 +3010,15 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             if (src.indexOf('.m3u8') !== -1) {{
                 if (window.Hls && Hls.isSupported()) {{
                     var hls = new Hls({{
-                        maxBufferLength: 6,
-                        maxMaxBufferLength: 14,
-                        backBufferLength: 12,
-                        startPosition: -1,
-                        capLevelToPlayerSize: true
+                        enableWorker: true,
+                        lowLatencyMode: true,
+                        backBufferLength: 30
                     }});
+                    hls.loadSource(src);
                     hls.attachMedia(video);
-                    hls.on(Hls.Events.MEDIA_ATTACHED, function() {{
-                        hls.loadSource(src);
-                    }});
                     hls.on(Hls.Events.MANIFEST_PARSED, function() {{
                         video.muted = true;
-                        livePos(video);
-                        video.play().catch(function(){{}});
+                        video.play().catch(function(e){{ console.log(e); }});
                     }});
                     hls.on(Hls.Events.ERROR, function(e, data) {{
                         if (!data.fatal) return;
@@ -3039,21 +3028,15 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
                             setTimeout(function() {{ try {{ hls.startLoad(); }} catch(err) {{}} }}, 2000);
                         }}
                     }});
-                    setInterval(function() {{
-                        if (video.duration && Math.abs((Date.now()/1000) % video.duration - video.currentTime) > 2.5) {{
-                            livePos(video);
-                        }}
-                    }}, 12000);
                 }} else if (video.canPlayType('application/vnd.apple.mpegurl')) {{
                     video.src = src;
                     video.muted = true;
-                    video.addEventListener('loadedmetadata', function() {{ livePos(video); }}, {{once: true}});
-                    video.play().catch(function(){{}});
+                    video.play().catch(function(e){{ console.log(e); }});
                 }}
             }} else {{
                 video.src = src;
                 video.muted = true;
-                video.play().catch(function(){{}});
+                video.play().catch(function(e){{ console.log(e); }});
             }}
         }}
 
@@ -3066,11 +3049,6 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 </script>
 </body>
 </html>'''
-
-    try:
-        components.html(full_html, height=height + 15)
-    except Exception:
-        st.markdown(full_html, unsafe_allow_html=True)
 
 
 def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo_model=None, ocr_reader=None):
