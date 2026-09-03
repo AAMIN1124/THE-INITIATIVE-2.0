@@ -11,16 +11,20 @@ warnings.filterwarnings("ignore")
 
 import socket
 import tempfile
+# Streamlit Cloud Linux OpenCV compatibility fix
+import sys
+import ctypes
+
 try:
     import cv2
 except Exception:
-    import sys, subprocess
-    try:
-        subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "opencv-python"], capture_output=True)
-        subprocess.run([sys.executable, "-m", "pip", "install", "--force-reinstall", "opencv-python-headless"], capture_output=True)
-        import cv2
-    except Exception as _e:
-        raise _e
+    if sys.platform.startswith("linux"):
+        for _lib in ["libOpenGL.so.0", "libGLX.so.0", "libglib-2.0.so.0", "/usr/lib/x86_64-linux-gnu/libOpenGL.so.0", "/usr/lib/x86_64-linux-gnu/libGLX.so.0"]:
+            try:
+                ctypes.CDLL(_lib, mode=ctypes.RTLD_GLOBAL)
+            except Exception:
+                pass
+    import cv2
 
 try:
     cv2.setLogLevel(0)
