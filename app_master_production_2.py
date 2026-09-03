@@ -59,6 +59,103 @@ st.set_page_config(
 )
 
 # ----------------- GLOBAL THREAD-SAFE INGEST BUFFER & WORKER REGISTRY -----------------
+# ----------------- AUTHENTICATED LOCAL HLS STREAM PROXY -----------------
+# Eliminates Browser CORS & Third-Party Cookie Blocks on cctv.corp8.cloud
+import http.server
+import socketserver
+import http.cookiejar
+import ssl
+
+try:
+    cv2.setLogLevel(0)
+except Exception:
+    pass
+os.environ["OPENCV_LOG_LEVEL"] = "FATAL"
+os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
+
+try:
+    from streamlit.runtime.scriptrunner import add_script_run_ctx
+except Exception:
+    add_script_run_ctx = None
+
+PROXY_PORT = 8505
+SENTINEL_SESSION_OPENER = None
+SENTINEL_PROXY_SERVER = None
+
+def init_sentinel_hls_proxy():
+    global SENTINEL_SESSION_OPENER, SENTINEL_PROXY_SERVER
+    if SENTINEL_PROXY_SERVER is not None:
+        return
+        
+    pass_token = "SYU2-RUFT-5N7B"
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    cj = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj), urllib.request.HTTPSHandler(context=ctx))
+
+    try:
+        login_data = urllib.parse.urlencode({'email': 'aaminattari1124@gmail.com', 'password': pass_token}).encode('utf-8')
+        req_login = urllib.request.Request(
+            'https://cctv.corp8.cloud/auth/login',
+            data=login_data,
+            headers={'User-Agent': 'Mozilla/5.0'}
+        )
+        opener.open(req_login, timeout=5.0)
+    except Exception:
+        pass
+
+    SENTINEL_SESSION_OPENER = opener
+
+    class HLSProxyHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, format, *args):
+            pass
+
+        def do_OPTIONS(self):
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', '*')
+            self.end_headers()
+
+        def do_GET(self):
+            path = self.path.lstrip('/')
+            remote_url = f"https://cctv.corp8.cloud/{path}"
+            try:
+                req = urllib.request.Request(
+                    remote_url,
+                    headers={'User-Agent': 'Mozilla/5.0', 'Referer': 'https://cctv.corp8.cloud/'}
+                )
+                resp = SENTINEL_SESSION_OPENER.open(req, timeout=5.0)
+                data = resp.read()
+
+                self.send_response(resp.status)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                for k, v in resp.headers.items():
+                    if k.lower() in ['content-type', 'content-length']:
+                        self.send_header(k, v)
+                self.end_headers()
+                self.wfile.write(data)
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(str(e).encode('utf-8'))
+
+    class ReusableTCPServer(socketserver.TCPServer):
+        allow_reuse_address = True
+
+    try:
+        server = ReusableTCPServer(('127.0.0.1', PROXY_PORT), HLSProxyHandler)
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        SENTINEL_PROXY_SERVER = server
+    except Exception:
+        pass
+
+init_sentinel_hls_proxy()
+
 if "GLOBAL_SIGHTINGS_BUFFER" not in globals():
     GLOBAL_SIGHTINGS_BUFFER = []
 if "GLOBAL_SIGHTINGS_LOCK" not in globals():
@@ -2805,11 +2902,11 @@ def classify_rider_helmet(head_crop):
 # ----------------- 100% GENUINE LIVE CCTV STREAM RENDERING ENGINE -----------------
 def get_active_stream_url(identifier):
     """
-    Safely retrieves the active HLS / RTSP / MP4 stream URL for cctv.corp8.cloud.
+    Safely retrieves the active HLS / RTSP / MP4 stream URL via the local proxy.
+    Bypasses CORS, cookie restrictions, and player stalls.
     """
-    pass_token = "SYU2-RUFT-5N7B"
     if not identifier:
-        return "https://cctv.corp8.cloud/cam14/index.m3u8"
+        return "http://127.0.0.1:8505/cam14/index.m3u8"
         
     if isinstance(identifier, dict):
         if identifier.get("custom_url"):
@@ -2842,7 +2939,7 @@ def get_active_stream_url(identifier):
     else:
         cam_key = f"cam{st_id}"
         
-    return f"https://cctv.corp8.cloud/{cam_key}/index.m3u8"
+    return f"http://127.0.0.1:8505/{cam_key}/index.m3u8"
 
 
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
@@ -2995,7 +3092,7 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo
             if stop_event.is_set():
                 break
             try:
-                os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1500"
+                os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1200"
                 temp_cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
                 if not temp_cap.isOpened():
                     temp_cap = cv2.VideoCapture(stream_url)
@@ -3130,7 +3227,6 @@ def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo
 def start_camera_daemon(cam_obj):
     cid = cam_obj.get("cam_id", cam_obj.get("stream_id", "CAM-01")) if isinstance(cam_obj, dict) else str(cam_obj)
     
-    # Pre-fetch models in main thread before spawning worker to prevent detached thread crash
     try:
         yolo_model, ocr_reader = get_ai_models()
     except Exception:
@@ -3156,8 +3252,14 @@ def start_camera_daemon(cam_obj):
             args=(cam_obj, stop_event, 1.8, yolo_model, ocr_reader), 
             daemon=True
         )
+        if add_script_run_ctx:
+            try:
+                add_script_run_ctx(t)
+            except Exception:
+                pass
         ACTIVE_DAEMON_THREADS[cid] = t
         t.start()
+
 
 def stop_camera_daemon(cid):
     with DAEMON_REGISTRY_LOCK:
