@@ -13,3 +13,5 @@ folium
 streamlit-folium
 qrcode
 requests
+
+cryptography
