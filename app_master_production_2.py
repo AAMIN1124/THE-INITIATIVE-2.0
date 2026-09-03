@@ -2961,94 +2961,36 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             {"stream_id": st_id, "cam_id": f"CAM-{int(st_id):02d}" if st_id.isdigit() else st_id, "name": f"Camera {st_id}", "city": "Gujarat", "dept": "Traffic Branch", "status": "ONLINE"}
         )
     
-    if "-" in st_id and not st_id.startswith("JURY"):
-        st_id = st_id.split("-")[-1]
-    clean_id = str(int(st_id)) if st_id.isdigit() else st_id
-    
-    cam_id_tag = cam_dict.get("cam_id", f"CAM-{int(clean_id):02d}" if clean_id.isdigit() else clean_id)
+    clean_id = st_id.split("-")[-1] if "-" in st_id else st_id
+    cam_id_tag = cam_dict.get("cam_id", f"CAM-{clean_id}")
     video_src = get_active_stream_url(cam_dict)
-
-    badge_html = f'''<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:monospace;">🔴 LIVE STREAM • {cam_id_tag}</div>'''
-    style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
     dom_id = f"vid_feed_{clean_id}"
-    
-    full_html = f'''<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<style>
-    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-    body {{ background: transparent; overflow: hidden; }}
-    .vid-box {{ position: relative; width: 100%; height: {height}px; overflow: hidden; border-radius: 14px; border: 1.5px solid {border_color}; box-shadow: 0 6px 20px rgba(14,165,233,0.12); background: #000; }}
-    video {{ width: 100%; height: {height}px; object-fit: cover; border-radius: 14px; background: #000; {style_extra} }}
-    .osd {{ position: absolute; top: 0; left: 0; z-index: 3; pointer-events: none; padding: 6px 12px; font-family: monospace; font-weight: 700; color: #fff; font-size: 11px; text-shadow: 0 1px 3px #000; background: linear-gradient(90deg, rgba(0,0,0,0.85), transparent); }}
-</style>
-</head>
-<body>
-<div class="vid-box">
-    <video id="{dom_id}" autoplay muted playsinline controls preload="auto" loop></video>
-    {badge_html}
-    <div class="osd" id="osd_{dom_id}"></div>
-</div>
-<script>
-    (function() {{
-        var video = document.getElementById('{dom_id}');
-        var osd = document.getElementById('osd_{dom_id}');
-        var src = '{video_src}';
-        var delay = {stagger_ms};
 
-        function updateClock() {{
-            var d = new Date(Date.now() + 19800000);
-            function pad(n) {{ return String(n).padStart(2, '0'); }}
-            if (osd) osd.textContent = pad(d.getUTCDate()) + '/' + pad(d.getUTCMonth()+1) + '/' + d.getUTCFullYear() + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds()) + ' IST';
-        }}
-        setInterval(updateClock, 500);
-        updateClock();
-
-        function startStream() {{
-            if (src.indexOf('.m3u8') !== -1) {{
-                if (window.Hls && Hls.isSupported()) {{
-                    var hls = new Hls({{
-                        enableWorker: true,
-                        lowLatencyMode: true,
-                        backBufferLength: 30
-                    }});
-                    hls.loadSource(src);
-                    hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, function() {{
-                        video.muted = true;
-                        video.play().catch(function(e){{ console.log(e); }});
-                    }});
-                    hls.on(Hls.Events.ERROR, function(e, data) {{
-                        if (!data.fatal) return;
-                        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {{
-                            try {{ hls.recoverMediaError(); }} catch(err) {{}}
-                        }} else {{
-                            setTimeout(function() {{ try {{ hls.startLoad(); }} catch(err) {{}} }}, 2000);
-                        }}
-                    }});
-                }} else if (video.canPlayType('application/vnd.apple.mpegurl')) {{
-                    video.src = src;
-                    video.muted = true;
-                    video.play().catch(function(e){{ console.log(e); }});
-                }}
+    player_html = f"""
+    <div style="position: relative; width: 100%; height: {height}px; background: #000000; border-radius: 14px; border: 2px solid {border_color}; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,0.25);">
+        <div style="position: absolute; top: 10px; left: 10px; background: rgba(220, 38, 38, 0.95); color: #FFF; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; z-index: 10; font-family: monospace;">
+            🔴 LIVE • {cam_id_tag}
+        </div>
+        <video id="{dom_id}" style="width: 100%; height: 100%; object-fit: cover;" autoplay muted playsinline loop></video>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script>
+        (function() {{
+            var video = document.getElementById('{dom_id}');
+            var src = '{video_src}';
+            if (Hls.isSupported() && src.indexOf('.m3u8') !== -1) {{
+                var hls = new Hls({{ enableWorker: true, lowLatencyMode: true }});
+                hls.loadSource(src);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {{ video.play().catch(function(){{}}); }});
             }} else {{
                 video.src = src;
-                video.muted = true;
-                video.play().catch(function(e){{ console.log(e); }});
+                video.play().catch(function(){{}});
             }}
-        }}
-
-        if (delay > 0) {{
-            setTimeout(startStream, delay);
-        }} else {{
-            startStream();
-        }}
-    }})();
-</script>
-</body>
-</html>'''
+        }})();
+    </script>
+    """
+    components.html(player_html, height=height + 15, scrolling=False)
 
 
 def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo_model=None, ocr_reader=None):
