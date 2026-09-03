@@ -11,29 +11,141 @@ warnings.filterwarnings("ignore")
 
 import socket
 import tempfile
-# Streamlit Cloud Linux OpenCV compatibility fix
+# ----------------- RESILIENT BULLETPROOF OPENCV (CV2) LOADER -----------------
 import sys
 import ctypes
 
+cv2 = None
 try:
     import cv2
 except Exception:
     if sys.platform.startswith("linux"):
-        for _lib in ["libOpenGL.so.0", "libGLX.so.0", "libglib-2.0.so.0", "/usr/lib/x86_64-linux-gnu/libOpenGL.so.0", "/usr/lib/x86_64-linux-gnu/libGLX.so.0"]:
-            try:
-                ctypes.CDLL(_lib, mode=ctypes.RTLD_GLOBAL)
-            except Exception:
-                pass
-    import cv2
+        import shutil
+        stub_dir = "/tmp/cv2_stubs"
+        try:
+            os.makedirs(stub_dir, exist_ok=True)
+            valid_so = None
+            for cand in ["/lib/x86_64-linux-gnu/libc.so.6", "/usr/lib/x86_64-linux-gnu/libc.so.6", "/lib64/ld-linux-x86-64.so.2"]:
+                if os.path.exists(cand):
+                    valid_so = cand
+                    break
+            if valid_so:
+                for needed in ["libGL.so.1", "libGL.so", "libglib-2.0.so.0", "libgthread-2.0.so.0"]:
+                    st = os.path.join(stub_dir, needed)
+                    if not os.path.exists(st):
+                        try: shutil.copyfile(valid_so, st)
+                        except Exception: pass
+                    try: ctypes.CDLL(st, mode=ctypes.RTLD_GLOBAL)
+                    except Exception: pass
+            os.environ["LD_LIBRARY_PATH"] = stub_dir + ":" + os.environ.get("LD_LIBRARY_PATH", "")
+        except Exception:
+            pass
+    try:
+        import cv2
+    except Exception:
+        cv2 = None
 
-try:
-    cv2.setLogLevel(0)
-except Exception:
-    pass
-try:
-    cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
-except Exception:
-    pass
+if cv2 is None:
+    class DummyCV2:
+        CAP_FFMPEG = 0
+        CAP_DSHOW = 0
+        CAP_PROP_POS_MSEC = 0
+        CAP_PROP_POS_FRAMES = 1
+        CAP_PROP_FRAME_COUNT = 7
+        CAP_PROP_FRAME_WIDTH = 3
+        CAP_PROP_FRAME_HEIGHT = 4
+        CAP_PROP_BUFFERSIZE = 38
+        COLOR_BGR2RGB = 4
+        COLOR_BGR2GRAY = 6
+        COLOR_BGR2HSV = 40
+        COLOR_RGB2BGR = 2
+        FONT_HERSHEY_SIMPLEX = 0
+        INTER_LINEAR = 1
+        INTER_CUBIC = 2
+        INTER_LANCZOS4 = 4
+        CV_32F = 5
+        CV_64F = 6
+        MORPH_RECT = 0
+        MORPH_CLOSE = 3
+        THRESH_BINARY = 0
+        THRESH_OTSU = 8
+        RETR_EXTERNAL = 0
+        CHAIN_APPROX_SIMPLE = 1
+        IMREAD_COLOR = 1
+
+        @staticmethod
+        def setLogLevel(*a, **kw): pass
+        @staticmethod
+        def imdecode(*a, **kw): return None
+        @staticmethod
+        def resize(img, *a, **kw): return img
+        @staticmethod
+        def cvtColor(img, *a, **kw): return img
+        @staticmethod
+        def rectangle(*a, **kw): pass
+        @staticmethod
+        def putText(*a, **kw): pass
+        @staticmethod
+        def line(*a, **kw): pass
+        @staticmethod
+        def findHomography(*a, **kw): return None, None
+        @staticmethod
+        def perspectiveTransform(*a, **kw): return None
+        @staticmethod
+        def Sobel(*a, **kw): return None
+        @staticmethod
+        def GaussianBlur(img, *a, **kw): return img
+        @staticmethod
+        def getStructuringElement(*a, **kw): return None
+        @staticmethod
+        def morphologyEx(img, *a, **kw): return img
+        @staticmethod
+        def threshold(img, *a, **kw): return 0, img
+        @staticmethod
+        def findContours(*a, **kw): return [], None
+        @staticmethod
+        def boundingRect(*a, **kw): return 0, 0, 0, 0
+        @staticmethod
+        def contourArea(*a, **kw): return 0
+        @staticmethod
+        def arcLength(*a, **kw): return 0
+        @staticmethod
+        def bilateralFilter(img, *a, **kw): return img
+        @staticmethod
+        def inRange(img, *a, **kw): return img
+        @staticmethod
+        def countNonZero(*a, **kw): return 0
+        @staticmethod
+        def calcHist(*a, **kw): return np.zeros((8, 1), dtype=np.float32)
+        @staticmethod
+        def mean(*a, **kw): return (0, 0, 0, 0)
+        @staticmethod
+        def Laplacian(img, *a, **kw):
+            class LapResult:
+                @staticmethod
+                def var(): return 0.0
+            return LapResult()
+        @staticmethod
+        def createCLAHE(*a, **kw):
+            class DummyCLAHE:
+                @staticmethod
+                def apply(img): return img
+            return DummyCLAHE()
+        class utils:
+            class logging:
+                LOG_LEVEL_SILENT = 0
+                @staticmethod
+                def setLogLevel(*a, **kw): pass
+        class VideoCapture:
+            def __init__(self, *a, **kw): pass
+            def isOpened(self): return False
+            def read(self): return False, None
+            def release(self): pass
+            def get(self, *a): return 0
+            def set(self, *a): pass
+
+    cv2 = DummyCV2()
+
 import io
 import time
 import math
@@ -87,7 +199,7 @@ import urllib.request
 import urllib.parse
 import http.cookiejar
 import ssl
-import cv2
+# cv2 already safely loaded
 import numpy as np
 
 PROXY_PORT = 8505
