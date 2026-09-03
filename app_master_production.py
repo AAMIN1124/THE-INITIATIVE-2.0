@@ -3181,14 +3181,16 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             <div class="hud-badge">🔴 GOV LIVE • {cam_id_tag}</div>
             <div class="hud-clock" id="clock_{dom_id}">--:--:-- IST</div>
             <div class="hud-status" id="stat_{dom_id}">● LIVE HLS STREAMING</div>
-                        <video id="{dom_id}" autoplay muted playsinline loop crossorigin="anonymous"></video>
+                                    <div id="player_wrap_{dom_id}" style="width: 100%; height: 100%; position: relative;">
+                <video id="{dom_id}" autoplay muted playsinline loop crossorigin="anonymous"></video>
+            </div>
         </div>
         <script>
             (function() {{
                 var v = document.getElementById('{dom_id}');
+                var wrap = document.getElementById('player_wrap_{dom_id}');
                 var clk = document.getElementById('clock_{dom_id}');
                 var stat = document.getElementById('stat_{dom_id}');
-                var m3u8_url = 'http://127.0.0.1:8505/{cam_target_id}/index.m3u8';
 
                 function updateClock() {{
                     var now = new Date(Date.now() + 19800000);
@@ -3198,74 +3200,69 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
                 setInterval(updateClock, 500);
                 updateClock();
 
-                // Live Active Screen Synchronizer (Reports exact playback second & on-screen frame)
-                var syncCanvas = document.createElement('canvas');
-                var isSyncing = false;
-                function syncLiveScreen() {{
-                    if (v.paused || v.ended) return;
-                    var curT = v.currentTime || 0;
-                    
-                    // 1. Report exact playback timestamp (Never fails, zero CORS overhead)
-                    try {{
-                        navigator.sendBeacon('http://127.0.0.1:8505/sync_playback?cam={clean_id}&t=' + curT.toFixed(2));
-                    }} catch(e) {{
-                        fetch('http://127.0.0.1:8505/sync_playback?cam={clean_id}&t=' + curT.toFixed(2), {{mode: 'no-cors'}}).catch(function(){{}});
-                    }}
+                // Detect if running on remote Streamlit Cloud or Localhost
+                var isCloud = (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1'));
 
-                    // 2. Report exact visual pixel canvas
-                    if (!isSyncing && v.videoWidth > 0) {{
+                if (isCloud) {{
+                    // Streamlit Cloud Mode: Directly embed authorized Government CCTV Portal
+                    stat.textContent = '● GOV CLOUD MESH ONLINE';
+                    stat.style.color = '#38BDF8';
+                    wrap.innerHTML = '<iframe src="https://cctv.corp8.cloud/" style="width: 100%; height: 100%; border: none; border-radius: 12px; background: #000;" allow="autoplay; fullscreen"></iframe>';
+                }} else {{
+                    // Localhost Mode: High-performance HLS proxy on port 8505 with active screen sync
+                    var m3u8_url = 'http://127.0.0.1:8505/{cam_target_id}/index.m3u8';
+
+                    var syncCanvas = document.createElement('canvas');
+                    var isSyncing = false;
+                    function syncLiveScreen() {{
+                        if (v.paused || v.ended) return;
+                        var curT = v.currentTime || 0;
                         try {{
-                            isSyncing = true;
-                            syncCanvas.width = v.videoWidth;
-                            syncCanvas.height = v.videoHeight;
-                            var ctx = syncCanvas.getContext('2d');
-                            ctx.drawImage(v, 0, 0, syncCanvas.width, syncCanvas.height);
-                            var dataUrl = syncCanvas.toDataURL('image/jpeg', 0.85);
-                            fetch('http://127.0.0.1:8505/sync_screen_frame?cam_id={clean_id}', {{
-                                method: 'POST',
-                                headers: {{'Content-Type': 'text/plain'}},
-                                body: dataUrl
-                            }}).finally(function() {{
-                                isSyncing = false;
-                            }});
-                        }} catch(err) {{
-                            isSyncing = false;
+                            navigator.sendBeacon('http://127.0.0.1:8505/sync_playback?cam={clean_id}&t=' + curT.toFixed(2));
+                        }} catch(e) {{
+                            fetch('http://127.0.0.1:8505/sync_playback?cam={clean_id}&t=' + curT.toFixed(2), {{mode: 'no-cors'}}).catch(function(){{}});
+                        }}
+
+                        if (!isSyncing && v.videoWidth > 0) {{
+                            try {{
+                                isSyncing = true;
+                                syncCanvas.width = v.videoWidth;
+                                syncCanvas.height = v.videoHeight;
+                                var ctx = syncCanvas.getContext('2d');
+                                ctx.drawImage(v, 0, 0, syncCanvas.width, syncCanvas.height);
+                                var dataUrl = syncCanvas.toDataURL('image/jpeg', 0.85);
+                                fetch('http://127.0.0.1:8505/sync_screen_frame?cam_id={clean_id}', {{
+                                    method: 'POST',
+                                    headers: {{'Content-Type': 'text/plain'}},
+                                    body: dataUrl
+                                }}).finally(function() {{ isSyncing = false; }});
+                            }} catch(err) {{ isSyncing = false; }}
                         }}
                     }}
-                }}
-                setInterval(syncLiveScreen, 250);
+                    setInterval(syncLiveScreen, 250);
 
-                if (Hls.isSupported()) {{
-                    var hls = new Hls({{
-                        enableWorker: true,
-                        lowLatencyMode: true,
-                        backBufferLength: 10
-                    }});
-                    hls.loadSource(m3u8_url);
-                    hls.attachMedia(v);
-                    hls.on(Hls.Events.MANIFEST_PARSED, function() {{
-                        v.play().catch(function(){{}});
-                        stat.textContent = '● 25 FPS • GOV LIVE';
-                        stat.style.color = '#4ADE80';
-                    }});
-                    hls.on(Hls.Events.ERROR, function(event, data) {{
-                        if (data.fatal) {{
-                            switch(data.type) {{
-                                case Hls.ErrorTypes.NETWORK_ERROR:
-                                    hls.startLoad();
-                                    break;
-                                case Hls.ErrorTypes.MEDIA_ERROR:
-                                    hls.recoverMediaError();
-                                    break;
-                                default:
-                                    hls.destroy();
-                                    break;
+                    if (Hls.isSupported()) {{
+                        var hls = new Hls({{ enableWorker: true, lowLatencyMode: true, backBufferLength: 10 }});
+                        hls.loadSource(m3u8_url);
+                        hls.attachMedia(v);
+                        hls.on(Hls.Events.MANIFEST_PARSED, function() {{
+                            v.play().catch(function(){{}});
+                            stat.textContent = '● 25 FPS • GOV LIVE';
+                            stat.style.color = '#4ADE80';
+                        }});
+                        hls.on(Hls.Events.ERROR, function(event, data) {{
+                            if (data.fatal) {{
+                                switch(data.type) {{
+                                    case Hls.ErrorTypes.NETWORK_ERROR: hls.startLoad(); break;
+                                    case Hls.ErrorTypes.MEDIA_ERROR: hls.recoverMediaError(); break;
+                                    default: hls.destroy(); break;
+                                }}
                             }}
-                        }}
-                    }});
-                }} else if (v.canPlayType('application/vnd.apple.mpegurl')) {{
-                    v.src = m3u8_url;
-                    v.play().catch(function(){{}});
+                        }});
+                    }} else if (v.canPlayType('application/vnd.apple.mpegurl')) {{
+                        v.src = m3u8_url;
+                        v.play().catch(function(){{}});
+                    }}
                 }}
             }})();
         </script>
