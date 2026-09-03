@@ -59,16 +59,116 @@ st.set_page_config(
 )
 
 # ----------------- GLOBAL THREAD-SAFE INGEST BUFFER & WORKER REGISTRY -----------------
-# ----------------- GUJARAT SCRB REAL-TIME STREAMING & SURVEILLANCE ENGINE -----------------
+# ----------------- AUTHENTICATED GOVERNMENT HLS STREAM PROXY -----------------
 try:
     from streamlit.runtime.scriptrunner import add_script_run_ctx
 except Exception:
     add_script_run_ctx = None
 
+import http.server
+import socketserver
 import threading
 import time
+import socket
+import urllib.request
+import urllib.parse
+import http.cookiejar
+import ssl
 import cv2
 import numpy as np
+
+PROXY_PORT = 8505
+SENTINEL_PROXY_SERVER = None
+SENTINEL_SESSION_OPENER = None
+SENTINEL_AUTH_LOCK = threading.RLock()
+
+def get_sentinel_opener():
+    global SENTINEL_SESSION_OPENER
+    with SENTINEL_AUTH_LOCK:
+        if SENTINEL_SESSION_OPENER is not None:
+            return SENTINEL_SESSION_OPENER
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        cj = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj), urllib.request.HTTPSHandler(context=ctx))
+        try:
+            login_data = urllib.parse.urlencode({'email': 'aaminattari1124@gmail.com', 'password': 'SYU2-RUFT-5N7B'}).encode('utf-8')
+            req = urllib.request.Request(
+                'https://cctv.corp8.cloud/auth/login',
+                data=login_data,
+                headers={'User-Agent': 'Mozilla/5.0'}
+            )
+            opener.open(req, timeout=7.0)
+        except Exception:
+            pass
+        SENTINEL_SESSION_OPENER = opener
+        return SENTINEL_SESSION_OPENER
+
+class ReusableHLSProxyServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', '*')
+        self.end_headers()
+
+    def do_GET(self):
+        clean_path = self.path.split('?')[0].lstrip('/')
+        opener = get_sentinel_opener()
+        remote_url = f'https://cctv.corp8.cloud/{clean_path}'
+
+        try:
+            req = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with opener.open(req, timeout=10.0) as remote_resp:
+                content = remote_resp.read()
+                ct = remote_resp.headers.get('Content-Type', 'application/octet-stream')
+
+                # Rewrite AES-128 key URI to local proxy
+                if 'm3u8' in clean_path:
+                    text = content.decode('utf-8', errors='ignore')
+                    text = text.replace('URI="/enc.key"', f'URI="http://127.0.0.1:{PROXY_PORT}/enc.key"')
+                    text = text.replace('URI="enc.key"', f'URI="http://127.0.0.1:{PROXY_PORT}/enc.key"')
+                    content = text.encode('utf-8')
+                    ct = 'application/vnd.apple.mpegurl'
+
+                self.send_response(200)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Content-Type', ct)
+                self.send_header('Content-Length', str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+        except Exception as e:
+            self.send_response(500)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(f'Government Proxy Error: {e}'.encode('utf-8'))
+
+def is_proxy_port_listening(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.2)
+        return s.connect_ex(('127.0.0.1', port)) == 0
+
+def init_sentinel_hls_proxy():
+    global SENTINEL_PROXY_SERVER
+    if SENTINEL_PROXY_SERVER is not None or is_proxy_port_listening(PROXY_PORT):
+        return
+    try:
+        server = ReusableHLSProxyServer(('127.0.0.1', PROXY_PORT), GovernmentHLSProxyHandler)
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        SENTINEL_PROXY_SERVER = server
+    except Exception:
+        pass
+
+init_sentinel_hls_proxy()
 
 if "GLOBAL_SIGHTINGS_BUFFER" not in globals():
     GLOBAL_SIGHTINGS_BUFFER = []
@@ -2839,7 +2939,7 @@ def get_active_stream_url(identifier):
     return f"https://live.corp8.cloud/stream/{st_id}"
 
 
-def render_cctv_live_container(cam_obj, height=480, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
+def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
     if isinstance(cam_obj, dict):
         cam_dict = cam_obj
         st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "14")))
@@ -2856,122 +2956,136 @@ def render_cctv_live_container(cam_obj, height=480, border_color="rgba(134,239,1
     cam_id_tag = cam_dict.get("cam_id", f"CAM-{clean_id}")
     cam_num = f"{int(clean_id):02d}" if clean_id.isdigit() else clean_id
     cam_target_id = f"cam{cam_num}"
-    cam_name = cam_dict.get("name", f"Checkpost {clean_id}")
 
-    dom_id = f"sentinel_box_{clean_id}"
+    dom_id = f"cctv_live_{clean_id}"
 
     player_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
+        <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-            body {{ background: #050B18; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, monospace; }}
-            .wrapper {{
+            body {{ background: #000000; overflow: hidden; font-family: monospace; }}
+            .vid-card {{
                 position: relative;
                 width: 100%;
                 height: {height}px;
-                background: #020617;
+                background: #050B18;
                 border-radius: 14px;
                 border: 2px solid {border_color};
                 overflow: hidden;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+                box-shadow: 0 6px 22px rgba(0,0,0,0.5);
             }}
-            .hud-bar {{
-                height: 44px;
-                background: rgba(15, 23, 42, 0.95);
-                border-bottom: 1px solid rgba(56, 189, 248, 0.3);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 0 16px;
-            }}
-            .live-tag {{
-                background: #DC2626;
+            .hud-badge {{
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                background: rgba(220, 38, 38, 0.95);
                 color: #FFFFFF;
+                padding: 4px 10px;
+                border-radius: 6px;
                 font-size: 11px;
                 font-weight: 800;
-                padding: 3px 10px;
-                border-radius: 6px;
                 letter-spacing: 0.5px;
-                display: flex;
-                align-items: center;
-                gap: 6px;
+                z-index: 10;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.4);
             }}
-            .live-tag::before {{
-                content: "";
-                width: 8px;
-                height: 8px;
-                background: #FFFFFF;
-                border-radius: 50%;
-                animation: pulse 1.2s infinite;
-            }}
-            @keyframes pulse {{
-                0% {{ opacity: 1; transform: scale(1); }}
-                50% {{ opacity: 0.3; transform: scale(0.7); }}
-                100% {{ opacity: 1; transform: scale(1); }}
-            }}
-            .title {{
-                color: #F8FAFC;
-                font-size: 13px;
-                font-weight: 700;
-            }}
-            .btn-direct {{
-                background: rgba(56, 189, 248, 0.15);
+            .hud-clock {{
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                background: rgba(15, 23, 42, 0.85);
                 color: #38BDF8;
-                border: 1px solid rgba(56, 189, 248, 0.4);
-                font-size: 11.5px;
-                font-weight: 700;
-                padding: 5px 12px;
+                padding: 4px 10px;
                 border-radius: 6px;
-                text-decoration: none;
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-                transition: all 0.2s;
+                font-size: 11px;
+                font-weight: 700;
+                z-index: 10;
+                border: 1px solid rgba(56, 189, 248, 0.3);
             }}
-            .btn-direct:hover {{
-                background: rgba(56, 189, 248, 0.3);
-                color: #FFFFFF;
+            .hud-status {{
+                position: absolute;
+                bottom: 8px;
+                right: 10px;
+                background: rgba(15, 23, 42, 0.85);
+                color: #4ADE80;
+                padding: 3px 8px;
+                border-radius: 5px;
+                font-size: 10.5px;
+                font-weight: 700;
+                z-index: 10;
+                border: 1px solid rgba(74, 222, 128, 0.3);
             }}
-            iframe {{
+            video {{
                 width: 100%;
-                height: calc(100% - 44px);
-                border: none;
-                background: #0A0E14;
+                height: 100%;
+                object-fit: cover;
+                display: block;
             }}
         </style>
     </head>
     <body>
-        <div class="wrapper">
-            <div class="hud-bar">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span class="live-tag">GOV LIVE</span>
-                    <span class="title">🏛️ GUJARAT POLICE SENTINEL • TARGET: {cam_id_tag}</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <a class="btn-direct" href="https://cctv.corp8.cloud" target="_blank">↗ FULL 30-CAMERA GRID</a>
-                </div>
-            </div>
-            <form id="sentinel_form_{dom_id}" method="POST" action="https://cctv.corp8.cloud/auth/login" target="frame_{dom_id}" style="display:none;">
-                <input type="hidden" name="email" value="aaminattari1124@gmail.com">
-                <input type="hidden" name="password" value="SYU2-RUFT-5N7B">
-            </form>
-            <iframe name="frame_{dom_id}" id="frame_{dom_id}" src="about:blank" allow="autoplay; fullscreen; clipboard-write" allowfullscreen></iframe>
+        <div class="vid-card">
+            <div class="hud-badge">🔴 GOV LIVE • {cam_id_tag}</div>
+            <div class="hud-clock" id="clock_{dom_id}">--:--:-- IST</div>
+            <div class="hud-status" id="stat_{dom_id}">● LIVE HLS STREAMING</div>
+            <video id="{dom_id}" autoplay muted playsinline loop></video>
         </div>
         <script>
-            setTimeout(function() {{
-                var form = document.getElementById('sentinel_form_{dom_id}');
-                if (form) {{
-                    form.submit();
+            (function() {{
+                var v = document.getElementById('{dom_id}');
+                var clk = document.getElementById('clock_{dom_id}');
+                var stat = document.getElementById('stat_{dom_id}');
+                var m3u8_url = 'http://127.0.0.1:8505/{cam_target_id}/index.m3u8';
+
+                function updateClock() {{
+                    var now = new Date(Date.now() + 19800000);
+                    var pad = function(n) {{ return String(n).padStart(2, '0'); }};
+                    clk.textContent = pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ':' + pad(now.getUTCSeconds()) + ' IST';
                 }}
-            }}, 50);
+                setInterval(updateClock, 500);
+                updateClock();
+
+                if (Hls.isSupported()) {{
+                    var hls = new Hls({{
+                        enableWorker: true,
+                        lowLatencyMode: true,
+                        backBufferLength: 10
+                    }});
+                    hls.loadSource(m3u8_url);
+                    hls.attachMedia(v);
+                    hls.on(Hls.Events.MANIFEST_PARSED, function() {{
+                        v.play().catch(function(){{}});
+                        stat.textContent = '● 25 FPS • GOV LIVE';
+                        stat.style.color = '#4ADE80';
+                    }});
+                    hls.on(Hls.Events.ERROR, function(event, data) {{
+                        if (data.fatal) {{
+                            switch(data.type) {{
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    hls.startLoad();
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    hls.recoverMediaError();
+                                    break;
+                                default:
+                                    hls.destroy();
+                                    break;
+                            }}
+                        }}
+                    }});
+                }} else if (v.canPlayType('application/vnd.apple.mpegurl')) {{
+                    v.src = m3u8_url;
+                    v.play().catch(function(){{}});
+                }}
+            }})();
         </script>
     </body>
     </html>
     """
-    components.html(player_html, height=height + 25, scrolling=False)
+    components.html(player_html, height=height + 15, scrolling=False)
 
 
 def start_camera_daemon(cam_obj=None):
