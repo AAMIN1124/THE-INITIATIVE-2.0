@@ -2962,14 +2962,27 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         )
     
     clean_id = st_id.split("-")[-1] if "-" in st_id else st_id
+    if clean_id.isdigit():
+        clean_id = str(int(clean_id))
     cam_id_tag = cam_dict.get("cam_id", f"CAM-{clean_id}")
-    video_src = get_active_stream_url(cam_dict)
+    
+    # Priority stream sources
+    pass_token = "SYU2-RUFT-5N7B"
+    custom_url = cam_dict.get("custom_url", "").strip() if isinstance(cam_dict, dict) else ""
+    if custom_url:
+        stream_url = custom_url
+    else:
+        stream_url = f"http://127.0.0.1:8505/cam{int(clean_id):02d}/index.m3u8" if clean_id.isdigit() else f"http://127.0.0.1:8505/cam{clean_id}/index.m3u8"
+    
     dom_id = f"vid_feed_{clean_id}"
 
     player_html = f"""
-    <div style="position: relative; width: 100%; height: {height}px; background: #000000; border-radius: 14px; border: 2px solid {border_color}; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,0.25);">
-        <div style="position: absolute; top: 10px; left: 10px; background: rgba(220, 38, 38, 0.95); color: #FFF; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; z-index: 10; font-family: monospace;">
+    <div style="position: relative; width: 100%; height: {height}px; background: #050B18; border-radius: 14px; border: 2px solid {border_color}; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,0.35);">
+        <div style="position: absolute; top: 10px; left: 10px; background: rgba(220, 38, 38, 0.95); color: #FFFFFF; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; z-index: 10; font-family: monospace; letter-spacing: 0.5px;">
             🔴 LIVE • {cam_id_tag}
+        </div>
+        <div id="status_{dom_id}" style="position: absolute; bottom: 8px; right: 10px; color: #38BDF8; font-size: 11px; font-family: monospace; z-index: 10;">
+            Connecting...
         </div>
         <video id="{dom_id}" style="width: 100%; height: 100%; object-fit: cover;" autoplay muted playsinline loop></video>
     </div>
@@ -2977,16 +2990,52 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
     <script>
         (function() {{
             var video = document.getElementById('{dom_id}');
-            var src = '{video_src}';
-            if (Hls.isSupported() && src.indexOf('.m3u8') !== -1) {{
-                var hls = new Hls({{ enableWorker: true, lowLatencyMode: true }});
-                hls.loadSource(src);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {{ video.play().catch(function(){{}}); }});
-            }} else {{
-                video.src = src;
-                video.play().catch(function(){{}});
+            var status = document.getElementById('status_{dom_id}');
+            var src = '{stream_url}';
+            
+            function startHls() {{
+                if (window.Hls && Hls.isSupported()) {{
+                    var hls = new Hls({{
+                        enableWorker: true,
+                        lowLatencyMode: true,
+                        backBufferLength: 30,
+                        xhrSetup: function(xhr, url) {{
+                            xhr.setRequestHeader('X-Access-Password', '{pass_token}');
+                        }}
+                    }});
+                    hls.loadSource(src);
+                    hls.attachMedia(video);
+                    
+                    hls.on(Hls.Events.MANIFEST_PARSED, function() {{
+                        status.textContent = "🟢 LIVE FEED";
+                        status.style.color = "#4ADE80";
+                        video.play().catch(function(e){{ console.log("Play error:", e); }});
+                    }});
+                    
+                    hls.on(Hls.Events.ERROR, function(event, data) {{
+                        console.warn("HLS event error:", data);
+                        if (data.fatal) {{
+                            status.textContent = "Reconnecting...";
+                            status.style.color = "#FACC15";
+                            switch (data.type) {{
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    hls.startLoad();
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    hls.recoverMediaError();
+                                    break;
+                                default:
+                                    setTimeout(function() {{ hls.loadSource(src); }}, 3000);
+                                    break;
+                            }}
+                        }}
+                    }});
+                }} else if (video.canPlayType('application/vnd.apple.mpegurl')) {{
+                    video.src = src;
+                    video.play().catch(function(){{}});
+                }}
             }}
+            setTimeout(startHls, {stagger_ms});
         }})();
     </script>
     """
