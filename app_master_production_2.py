@@ -59,128 +59,154 @@ st.set_page_config(
 )
 
 # ----------------- GLOBAL THREAD-SAFE INGEST BUFFER & WORKER REGISTRY -----------------
-# ----------------- AUTHENTICATED LOCAL HLS STREAM PROXY -----------------
+# ----------------- HIGH-PERFORMANCE PYTHON OPENCV MJPEG LIVE STREAMER -----------------
 try:
     from streamlit.runtime.scriptrunner import add_script_run_ctx
 except Exception:
     add_script_run_ctx = None
 
+import http.server
+import socketserver
+import threading
+import time
+import cv2
+import numpy as np
+
 PROXY_PORT = 8505
-SENTINEL_ACCESS_PASSWORD = "SYU2-RUFT-5N7B"
-SENTINEL_PROXY_SERVER = None
+LIVE_CAM_CAPS = {}
+LIVE_CAM_LOCK = threading.RLock()
+SENTINEL_STREAM_SERVER = None
 
-def init_sentinel_hls_proxy():
-    global SENTINEL_PROXY_SERVER
-    if SENTINEL_PROXY_SERVER is not None:
-        return
+def get_or_create_camera_capture(clean_id):
+    with LIVE_CAM_LOCK:
+        if clean_id in LIVE_CAM_CAPS and LIVE_CAM_CAPS[clean_id]["cap"] is not None and LIVE_CAM_CAPS[clean_id]["cap"].isOpened():
+            return LIVE_CAM_CAPS[clean_id]
+        
+        # Candidate URLs as defined in the official hackathon guide
+        candidates = [
+            f"rtsp://live.corp8.cloud:8554/stream/{clean_id}",
+            f"https://live.corp8.cloud/live/stream/{clean_id}/",
+            f"https://live.corp8.cloud/stream/{clean_id}",
+            f"http://live.corp8.cloud:8889/stream/{clean_id}/",
+            f"https://cctv.corp8.cloud/cam{int(clean_id):02d}/index.m3u8" if clean_id.isdigit() else f"https://cctv.corp8.cloud/cam{clean_id}/index.m3u8"
+        ]
+        
+        cap = None
+        for url in candidates:
+            try:
+                os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|stimeout;2000000"
+                c = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+                if not c.isOpened():
+                    c = cv2.VideoCapture(url)
+                if c.isOpened():
+                    ret, test_f = c.read()
+                    if ret and test_f is not None:
+                        cap = c
+                        break
+                    else:
+                        c.release()
+            except Exception:
+                continue
+                
+        LIVE_CAM_CAPS[clean_id] = {
+            "cap": cap,
+            "last_frame": None,
+            "last_time": time.time(),
+            "connecting": cap is None
+        }
+        return LIVE_CAM_CAPS[clean_id]
 
-    import http.server
-    import socketserver
-    import urllib.request
-    import ssl
-    import threading
+class ThreadingMJPEGServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
+class MJPEGStreamHandler(http.server.BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
 
-    class ThreadingHLSProxyServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-        allow_reuse_address = True
-        daemon_threads = True
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        self.end_headers()
 
-    class HLSProxyHandler(http.server.BaseHTTPRequestHandler):
-        def log_message(self, format, *args):
-            pass
+    def do_GET(self):
+        path = self.path.lstrip('/')
+        clean_path = path.split('?')[0]
+        
+        # Extract camera ID
+        digits = "".join(filter(str.isdigit, clean_path)) or "1"
+        clean_id = str(int(digits))
 
-        def do_OPTIONS(self):
-            self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', '*')
-            self.send_header('Access-Control-Max-Age', '86400')
-            self.end_headers()
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
+        self.send_header('Cache-Control', 'no-cache, private')
+        self.end_headers()
 
-        def do_GET(self):
-            path = self.path.lstrip('/')
-            clean_path = path.split('?')[0]
+        fail_count = 0
+        while True:
+            cam_data = get_or_create_camera_capture(clean_id)
+            cap = cam_data.get("cap")
+            frame = None
 
-            # Upstream candidate URLs on live.corp8.cloud & cctv.corp8.cloud
-            candidate_urls = [
-                f"https://live.corp8.cloud/{clean_path}",
-                f"https://live.corp8.cloud/live/{clean_path}",
-                f"http://live.corp8.cloud:8889/{clean_path}",
-                f"https://cctv.corp8.cloud/{clean_path}"
-            ]
-            
-            # If requesting cam format, map to stream/{id}
-            if "cam" in clean_path:
-                digits = "".join(filter(str.isdigit, clean_path.split('/')[0]))
-                if digits:
-                    int_id = str(int(digits))
-                    candidate_urls.insert(0, f"https://live.corp8.cloud/live/stream/{int_id}/")
-                    candidate_urls.insert(1, f"https://live.corp8.cloud/stream/{int_id}")
-                    candidate_urls.append(f"https://cctv.corp8.cloud/cam{int(int_id):02d}/index.m3u8")
-
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0',
-                'X-Access-Password': SENTINEL_ACCESS_PASSWORD,
-                'Authorization': f'Bearer {SENTINEL_ACCESS_PASSWORD}',
-                'Cookie': f'token={SENTINEL_ACCESS_PASSWORD}; password={SENTINEL_ACCESS_PASSWORD}; access_password={SENTINEL_ACCESS_PASSWORD}',
-                'Referer': 'https://cctv.corp8.cloud/'
-            }
-            if 'Range' in self.headers:
-                headers['Range'] = self.headers['Range']
-
-            resp = None
-            for url in candidate_urls:
+            if cap is not None and cap.isOpened():
                 try:
-                    req = urllib.request.Request(url, headers=headers)
-                    resp = urllib.request.urlopen(req, timeout=5.0, context=ctx)
-                    break
+                    ret, f = cap.read()
+                    if ret and f is not None and f.size > 0:
+                        frame = f
+                        cam_data["last_frame"] = f
+                        fail_count = 0
+                    else:
+                        fail_count += 1
                 except Exception:
-                    continue
+                    fail_count += 1
 
-            if resp is None:
-                self.send_response(404)
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                return
+            if fail_count > 10 or cap is None:
+                with LIVE_CAM_LOCK:
+                    if clean_id in LIVE_CAM_CAPS:
+                        try:
+                            if LIVE_CAM_CAPS[clean_id]["cap"]:
+                                LIVE_CAM_CAPS[clean_id]["cap"].release()
+                        except Exception:
+                            pass
+                        del LIVE_CAM_CAPS[clean_id]
+
+            if frame is None:
+                # High-tech live HUD fallback frame
+                frame = np.zeros((480, 854, 3), dtype=np.uint8)
+                frame[:] = (12, 18, 28)
+                cv2.rectangle(frame, (10, 10), (844, 470), (45, 60, 80), 2)
+                t_str = time.strftime('%Y-%m-%d %H:%M:%S')
+                cv2.putText(frame, f"GUJARAT POLICE SCRB SURVEILLANCE GRID • NODE {clean_id}", (30, 45), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 229, 255), 2)
+                cv2.putText(frame, f"Connecting to RTSP Stream (rtsp://live.corp8.cloud:8554/stream/{clean_id})...", (30, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (56, 189, 248), 2)
+                cv2.putText(frame, f"Hardware Clock: {t_str} | Protocol: TCP", (30, 440), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (148, 163, 184), 1)
 
             try:
-                # If m3u8 playlist, rewrite keys and endpoints
-                if clean_path.endswith('.m3u8') or 'mpegurl' in resp.headers.get('Content-Type', ''):
-                    content = resp.read()
-                    content = content.replace(b'URI="/enc.key"', f'URI="http://127.0.0.1:{PROXY_PORT}/enc.key"'.encode('utf-8'))
-                    content = content.replace(b'URI=\"/enc.key\"', f'URI=\"http://127.0.0.1:{PROXY_PORT}/enc.key\"'.encode('utf-8'))
-                    self.send_response(resp.status)
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.send_header('Content-Type', 'application/vnd.apple.mpegurl')
-                    self.send_header('Content-Length', str(len(content)))
-                    self.end_headers()
-                    self.wfile.write(content)
-                else:
-                    # Stream live binary video chunks continuously
-                    self.send_response(resp.status)
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    for k in ['Content-Type', 'Content-Range', 'Accept-Ranges']:
-                        if k in resp.headers:
-                            self.send_header(k, resp.headers[k])
-                    self.end_headers()
-                    while True:
-                        chunk = resp.read(65536)
-                        if not chunk:
-                            break
-                        self.wfile.write(chunk)
+                ret_enc, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                if ret_enc:
+                    chunk = jpeg.tobytes()
+                    header = (
+                        b"--frame\r\n"
+                        b"Content-Type: image/jpeg\r\n"
+                        + f"Content-Length: {len(chunk)}\r\n\r\n".encode("utf-8")
+                    )
+                    self.wfile.write(header)
+                    self.wfile.write(chunk)
+                    self.wfile.write(b"\r\n")
+                time.sleep(0.04)  # ~25 FPS delivery
             except Exception:
-                pass
-            finally:
-                resp.close()
+                break
 
+def init_sentinel_hls_proxy():
+    global SENTINEL_STREAM_SERVER
+    if SENTINEL_STREAM_SERVER is not None:
+        return
     try:
-        server = ThreadingHLSProxyServer(('127.0.0.1', PROXY_PORT), HLSProxyHandler)
+        server = ThreadingMJPEGServer(('127.0.0.1', PROXY_PORT), MJPEGStreamHandler)
         t = threading.Thread(target=server.serve_forever, daemon=True)
         t.start()
-        SENTINEL_PROXY_SERVER = server
+        SENTINEL_STREAM_SERVER = server
     except Exception:
         pass
 
@@ -2972,12 +2998,9 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         clean_id = str(int(clean_id))
     cam_id_tag = cam_dict.get("cam_id", f"CAM-{clean_id}")
     
-    # Official challenge browser playback endpoint (direct media range stream)
-    custom_url = cam_dict.get("custom_url", "").strip() if isinstance(cam_dict, dict) else ""
-    stream_url = custom_url if custom_url else f"https://live.corp8.cloud/stream/{clean_id}"
+    stream_url = f"http://127.0.0.1:8505/stream/{clean_id}"
     dom_id = f"vid_feed_{clean_id}"
 
-    # Pure HTML5 native video tag without hls.js (bypasses browser CORS XMLHttpRequest block)
     player_html = f"""
     <!DOCTYPE html>
     <html>
@@ -3021,26 +3044,20 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
                 padding: 2px 8px;
                 border-radius: 4px;
             }}
-            video {{
+            img {{
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
+                display: block;
             }}
         </style>
     </head>
     <body>
         <div class="cctv-box">
             <div class="cctv-badge">🔴 LIVE • {cam_id_tag}</div>
-            <div class="cctv-status" id="stat_{dom_id}">● STREAMING</div>
-            <video id="{dom_id}" src="{stream_url}" autoplay muted playsinline controls preload="auto" loop></video>
+            <div class="cctv-status" id="stat_{dom_id}">● MJPEG 25FPS</div>
+            <img id="{dom_id}" src="{stream_url}" alt="CCTV Stream {cam_id_tag}" />
         </div>
-        <script>
-            (function() {{
-                var v = document.getElementById('{dom_id}');
-                v.muted = true;
-                v.play().catch(function() {{}});
-            }})();
-        </script>
     </body>
     </html>
     """
