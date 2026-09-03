@@ -11,7 +11,16 @@ warnings.filterwarnings("ignore")
 
 import socket
 import tempfile
-import cv2
+try:
+    import cv2
+except Exception:
+    import sys, subprocess
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "opencv-python"], capture_output=True)
+        subprocess.run([sys.executable, "-m", "pip", "install", "--force-reinstall", "opencv-python-headless"], capture_output=True)
+        import cv2
+    except Exception as _e:
+        raise _e
 
 try:
     cv2.setLogLevel(0)
