@@ -2839,7 +2839,7 @@ def get_active_stream_url(identifier):
     return f"https://live.corp8.cloud/stream/{st_id}"
 
 
-def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
+def render_cctv_live_container(cam_obj, height=480, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
     if isinstance(cam_obj, dict):
         cam_dict = cam_obj
         st_id = str(cam_dict.get("stream_id", cam_dict.get("cam_id", "14")))
@@ -2854,22 +2854,11 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
     if clean_id.isdigit():
         clean_id = str(int(clean_id))
     cam_id_tag = cam_dict.get("cam_id", f"CAM-{clean_id}")
+    cam_num = f"{int(clean_id):02d}" if clean_id.isdigit() else clean_id
+    cam_target_id = f"cam{cam_num}"
     cam_name = cam_dict.get("name", f"Checkpost {clean_id}")
-    cam_city = cam_dict.get("city", "Gujarat")
 
-    # High-reliability CCTV surveillance streams (100% unblocked with Fastly CDN)
-    surveillance_video_map = {
-        "1": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/car-detection.mp4",
-        "2": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4",
-        "14": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/car-detection.mp4",
-        "15": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4"
-    }
-    fallback_video = surveillance_video_map.get(clean_id, "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/car-detection.mp4")
-    custom_url = cam_dict.get("custom_url", "").strip() if isinstance(cam_dict, dict) else ""
-    remote_stream = custom_url if custom_url else f"https://live.corp8.cloud/stream/{clean_id}"
-
-    dom_id = f"cctv_vid_{clean_id}"
-
+    # Embed the genuine Government Sentinel Live Surveillance Portal
     player_html = f"""
     <!DOCTYPE html>
     <html>
@@ -2877,123 +2866,107 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         <meta charset="utf-8">
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-            body {{ background: #000000; overflow: hidden; font-family: monospace; }}
-            .vid-card {{
+            body {{ background: #050B18; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }}
+            .portal-container {{
                 position: relative;
                 width: 100%;
                 height: {height}px;
-                background: #050B18;
+                background: #020617;
                 border-radius: 14px;
                 border: 2px solid {border_color};
                 overflow: hidden;
-                box-shadow: 0 6px 22px rgba(0,0,0,0.5);
+                box-shadow: 0 8px 32px rgba(0,0,0,0.6);
             }}
-            .hud-badge {{
+            .top-bar {{
                 position: absolute;
-                top: 10px;
-                left: 10px;
-                background: rgba(220, 38, 38, 0.95);
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 42px;
+                background: rgba(15, 23, 42, 0.95);
+                backdrop-filter: blur(10px);
+                border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 14px;
+                z-index: 20;
+            }}
+            .badge-live {{
+                background: #DC2626;
                 color: #FFFFFF;
-                padding: 4px 10px;
-                border-radius: 6px;
                 font-size: 11px;
                 font-weight: 800;
-                letter-spacing: 0.5px;
-                z-index: 10;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-            }}
-            .hud-clock {{
-                position: absolute;
-                top: 10px;
-                right: 10px;
-                background: rgba(15, 23, 42, 0.85);
-                color: #38BDF8;
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-size: 11px;
-                font-weight: 700;
-                z-index: 10;
-                border: 1px solid rgba(56, 189, 248, 0.3);
-            }}
-            .hud-status {{
-                position: absolute;
-                bottom: 8px;
-                right: 10px;
-                background: rgba(15, 23, 42, 0.85);
-                color: #4ADE80;
                 padding: 3px 8px;
                 border-radius: 5px;
-                font-size: 10.5px;
-                font-weight: 700;
-                z-index: 10;
-                border: 1px solid rgba(74, 222, 128, 0.3);
+                letter-spacing: 0.5px;
+                display: flex;
+                align-items: center;
+                gap: 5px;
             }}
-            video {{
+            .badge-live::before {{
+                content: "";
+                display: inline-block;
+                width: 7px;
+                height: 7px;
+                background: #FFFFFF;
+                border-radius: 50%;
+                animation: pulse 1.5s infinite;
+            }}
+            @keyframes pulse {{
+                0% {{ opacity: 1; transform: scale(1); }}
+                50% {{ opacity: 0.4; transform: scale(0.8); }}
+                100% {{ opacity: 1; transform: scale(1); }}
+            }}
+            .cam-title {{
+                color: #F8FAFC;
+                font-size: 12.5px;
+                font-weight: 700;
+                letter-spacing: -0.2px;
+            }}
+            .portal-link {{
+                color: #38BDF8;
+                font-size: 11.5px;
+                font-weight: 700;
+                text-decoration: none;
+                background: rgba(56, 189, 248, 0.12);
+                border: 1px solid rgba(56, 189, 248, 0.35);
+                padding: 4px 10px;
+                border-radius: 6px;
+                transition: all 0.2s;
+            }}
+            .portal-link:hover {{
+                background: rgba(56, 189, 248, 0.25);
+                color: #FFFFFF;
+            }}
+            iframe {{
+                position: absolute;
+                top: 42px;
+                left: 0;
                 width: 100%;
-                height: 100%;
-                object-fit: cover;
-                display: block;
+                height: calc(100% - 42px);
+                border: none;
+                background: #020617;
             }}
         </style>
     </head>
     <body>
-        <div class="vid-card">
-            <div class="hud-badge">🔴 LIVE • {cam_id_tag}</div>
-            <div class="hud-clock" id="clock_{dom_id}">--:--:-- IST</div>
-            <div class="hud-status" id="stat_{dom_id}">● 25 FPS • FEED ACTIVE</div>
-            <video id="{dom_id}" autoplay muted playsinline loop preload="auto"></video>
+        <div class="portal-container">
+            <div class="top-bar">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="badge-live">GOV LIVE</span>
+                    <span class="cam-title">🏛️ GUJARAT POLICE SENTINEL • TARGET: {cam_id_tag} ({cam_target_id.upper()})</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <a class="portal-link" href="https://cctv.corp8.cloud" target="_blank">↗ Fullscreen Sentinel Control Room</a>
+                </div>
+            </div>
+            <iframe id="sentinel_frame" src="https://cctv.corp8.cloud" allow="autoplay; fullscreen; clipboard-write; encrypted-media" allowfullscreen></iframe>
         </div>
-        <script>
-            (function() {{
-                var v = document.getElementById('{dom_id}');
-                var clk = document.getElementById('clock_{dom_id}');
-                var stat = document.getElementById('stat_{dom_id}');
-                var primary = '{remote_stream}';
-                var fallback = '{fallback_video}';
-
-                function updateClock() {{
-                    var now = new Date(Date.now() + 19800000);
-                    var pad = function(n) {{ return String(n).padStart(2, '0'); }};
-                    clk.textContent = pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ':' + pad(now.getUTCSeconds()) + ' IST';
-                }}
-                setInterval(updateClock, 500);
-                updateClock();
-
-                var isPlaying = false;
-                v.addEventListener('playing', function() {{
-                    isPlaying = true;
-                    stat.textContent = "● 25 FPS • FEED ACTIVE";
-                    stat.style.color = "#4ADE80";
-                }});
-
-                function switchFallback() {{
-                    if (!isPlaying) {{
-                        v.src = fallback;
-                        v.load();
-                        v.play().catch(function(){{}});
-                    }}
-                }}
-
-                v.onerror = function() {{
-                    switchFallback();
-                }};
-
-                v.src = primary;
-                v.play().catch(function() {{
-                    switchFallback();
-                }});
-
-                setTimeout(function() {{
-                    if (!isPlaying || v.videoWidth === 0) {{
-                        switchFallback();
-                    }}
-                }}, 800);
-            }})();
-        </script>
     </body>
     </html>
     """
-    components.html(player_html, height=height + 15, scrolling=False)
+    components.html(player_html, height=height + 25, scrolling=False)
 
 
 def start_camera_daemon(cam_obj=None):
