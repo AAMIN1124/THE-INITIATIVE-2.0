@@ -122,9 +122,11 @@ def init_sentinel_hls_proxy():
 
         def do_OPTIONS(self):
             self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*'); self.send_header('Access-Control-Allow-Credentials', 'true')
-            self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+            origin = self.headers.get('Origin', '*')
+            self.send_header('Access-Control-Allow-Origin', origin)
+            self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS, HEAD')
             self.send_header('Access-Control-Allow-Headers', '*')
+            self.send_header('Access-Control-Max-Age', '86400')
             self.end_headers()
 
         def do_GET(self):
@@ -147,7 +149,8 @@ def init_sentinel_hls_proxy():
                     data = data.replace(b'URI=\"/enc.key\"', f'URI=\"http://127.0.0.1:{PROXY_PORT}/enc.key\"'.encode('utf-8'))
 
                 self.send_response(resp.status)
-                self.send_header('Access-Control-Allow-Origin', '*'); self.send_header('Access-Control-Allow-Credentials', 'true')
+                origin = self.headers.get('Origin', '*')
+                self.send_header('Access-Control-Allow-Origin', origin)
                 for k, v in resp.headers.items():
                     if k.lower() in ['content-type']:
                         self.send_header(k, v)
@@ -160,7 +163,7 @@ def init_sentinel_hls_proxy():
             except Exception as e:
                 try:
                     self.send_response(500)
-                    self.send_header('Access-Control-Allow-Origin', '*'); self.send_header('Access-Control-Allow-Credentials', 'true')
+                    self.send_header('Access-Control-Allow-Origin', '*')
                     self.end_headers()
                     self.wfile.write(str(e).encode('utf-8'))
                 except Exception:
@@ -2973,32 +2976,51 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
 <html>
 <head>
 <meta charset="utf-8">
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="http://127.0.0.1:8505/hls.min.js"></script>
 <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{ background: transparent; overflow: hidden; }}
     .vid-box {{ position: relative; width: 100%; height: {height}px; overflow: hidden; border-radius: 14px; border: 1.5px solid {border_color}; box-shadow: 0 6px 20px rgba(14,165,233,0.12); background: #000; }}
     video {{ width: 100%; height: {height}px; object-fit: cover; border-radius: 14px; background: #000; {style_extra} }}
+    .osd {{ position: absolute; top: 0; left: 0; z-index: 3; pointer-events: none; padding: 6px 12px; font-family: monospace; font-weight: 700; color: #fff; font-size: 11px; text-shadow: 0 1px 3px #000; background: linear-gradient(90deg, rgba(0,0,0,0.85), transparent); }}
 </style>
 </head>
 <body>
 <div class="vid-box">
     <video id="{dom_id}" autoplay muted playsinline controls preload="auto" loop></video>
     {badge_html}
+    <div class="osd" id="osd_{dom_id}"></div>
 </div>
 <script>
     (function() {{
         var video = document.getElementById('{dom_id}');
+        var osd = document.getElementById('osd_{dom_id}');
         var src = '{video_src}';
         var delay = {stagger_ms};
+
+        function livePos(v) {{
+            if (v.duration && isFinite(v.duration) && v.duration > 1) {{
+                try {{ v.currentTime = (Date.now() / 1000) % v.duration; }} catch(e) {{}}
+            }}
+        }}
+
+        function updateClock() {{
+            var d = new Date(Date.now() + 19800000);
+            function pad(n) {{ return String(n).padStart(2, '0'); }}
+            if (osd) osd.textContent = pad(d.getUTCDate()) + '/' + pad(d.getUTCMonth()+1) + '/' + d.getUTCFullYear() + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds()) + ' IST';
+        }}
+        setInterval(updateClock, 500);
+        updateClock();
 
         function startStream() {{
             if (src.indexOf('.m3u8') !== -1) {{
                 if (window.Hls && Hls.isSupported()) {{
                     var hls = new Hls({{
-                        xhrSetup: function(xhr, url) {{ xhr.withCredentials = true; }},
-                        maxBufferLength: 8,
-                        maxMaxBufferLength: 16
+                        maxBufferLength: 6,
+                        maxMaxBufferLength: 14,
+                        backBufferLength: 12,
+                        startPosition: -1,
+                        capLevelToPlayerSize: true
                     }});
                     hls.attachMedia(video);
                     hls.on(Hls.Events.MEDIA_ATTACHED, function() {{
@@ -3006,20 +3028,26 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
                     }});
                     hls.on(Hls.Events.MANIFEST_PARSED, function() {{
                         video.muted = true;
+                        livePos(video);
                         video.play().catch(function(){{}});
                     }});
                     hls.on(Hls.Events.ERROR, function(e, data) {{
-                        if (data.fatal) {{
-                            if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {{
-                                try {{ hls.recoverMediaError(); }} catch(err) {{}}
-                            }} else {{
-                                setTimeout(function() {{ try {{ hls.startLoad(); }} catch(err) {{}} }}, 2000);
-                            }}
+                        if (!data.fatal) return;
+                        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {{
+                            try {{ hls.recoverMediaError(); }} catch(err) {{}}
+                        }} else {{
+                            setTimeout(function() {{ try {{ hls.startLoad(); }} catch(err) {{}} }}, 2000);
                         }}
                     }});
+                    setInterval(function() {{
+                        if (video.duration && Math.abs((Date.now()/1000) % video.duration - video.currentTime) > 2.5) {{
+                            livePos(video);
+                        }}
+                    }}, 12000);
                 }} else if (video.canPlayType('application/vnd.apple.mpegurl')) {{
                     video.src = src;
                     video.muted = true;
+                    video.addEventListener('loadedmetadata', function() {{ livePos(video); }}, {{once: true}});
                     video.play().catch(function(){{}});
                 }}
             }} else {{
