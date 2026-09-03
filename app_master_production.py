@@ -2991,312 +2991,96 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
         clean_id = str(int(clean_id))
     cam_id_tag = cam_dict.get("cam_id", f"CAM-{clean_id}")
     
-    # Priority stream sources
-    pass_token = "SYU2-RUFT-5N7B"
-    custom_url = cam_dict.get("custom_url", "").strip() if isinstance(cam_dict, dict) else ""
-    if custom_url:
-        stream_url = custom_url
-    else:
-        stream_url = f"http://127.0.0.1:8505/cam{int(clean_id):02d}/index.m3u8" if clean_id.isdigit() else f"http://127.0.0.1:8505/cam{clean_id}/index.m3u8"
+    # Official Endpoints
+    primary_stream = f"https://live.corp8.cloud/live/stream/{clean_id}/"
+    fallback_stream = f"https://live.corp8.cloud/stream/{clean_id}"
+    proxy_stream = f"http://127.0.0.1:8505/cam{int(clean_id):02d}/index.m3u8" if clean_id.isdigit() else f"http://127.0.0.1:8505/cam{clean_id}/index.m3u8"
     
     dom_id = f"vid_feed_{clean_id}"
 
     player_html = f"""
-    <div style="position: relative; width: 100%; height: {height}px; background: #050B18; border-radius: 14px; border: 2px solid {border_color}; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,0.35);">
+    <div style="position: relative; width: 100%; height: {height}px; background: #000000; border-radius: 14px; border: 2px solid {border_color}; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,0.35);">
         <div style="position: absolute; top: 10px; left: 10px; background: rgba(220, 38, 38, 0.95); color: #FFFFFF; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; z-index: 10; font-family: monospace; letter-spacing: 0.5px;">
             🔴 LIVE • {cam_id_tag}
         </div>
-        <div id="status_{dom_id}" style="position: absolute; bottom: 8px; right: 10px; color: #38BDF8; font-size: 11px; font-family: monospace; z-index: 10;">
+        <div id="status_{dom_id}" style="position: absolute; bottom: 8px; right: 10px; color: #38BDF8; font-size: 11px; font-family: monospace; z-index: 10; background: rgba(0,0,0,0.6); padding: 2px 8px; border-radius: 4px;">
             Connecting...
         </div>
-        <video id="{dom_id}" style="width: 100%; height: 100%; object-fit: cover;" autoplay muted playsinline loop></video>
+        <video id="{dom_id}" style="width: 100%; height: 100%; object-fit: cover;" autoplay muted playsinline controls preload="auto" loop></video>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script>
         (function() {{
             var video = document.getElementById('{dom_id}');
             var status = document.getElementById('status_{dom_id}');
-            var src = '{stream_url}';
-            
-            function startHls() {{
+            var urls = ['{primary_stream}', '{fallback_stream}', '{proxy_stream}'];
+            var currentIdx = 0;
+
+            function playDirect(url) {{
+                video.src = url;
+                video.muted = true;
+                var playPromise = video.play();
+                if (playPromise !== undefined) {{
+                    playPromise.then(function() {{
+                        status.textContent = "🟢 LIVE STREAM";
+                        status.style.color = "#4ADE80";
+                    }}).catch(function(err) {{
+                        playHls(url);
+                    }});
+                }}
+            }}
+
+            function playHls(url) {{
                 if (window.Hls && Hls.isSupported()) {{
                     var hls = new Hls({{
                         enableWorker: true,
                         lowLatencyMode: true,
-                        backBufferLength: 30,
-                        xhrSetup: function(xhr, url) {{
-                            xhr.setRequestHeader('X-Access-Password', '{pass_token}');
-                        }}
+                        backBufferLength: 15
                     }});
-                    hls.loadSource(src);
+                    hls.loadSource(url);
                     hls.attachMedia(video);
-                    
                     hls.on(Hls.Events.MANIFEST_PARSED, function() {{
-                        status.textContent = "🟢 LIVE FEED";
+                        video.muted = true;
+                        video.play().catch(function(){{}});
+                        status.textContent = "🟢 LIVE (HLS)";
                         status.style.color = "#4ADE80";
-                        video.play().catch(function(e){{ console.log("Play error:", e); }});
                     }});
-                    
                     hls.on(Hls.Events.ERROR, function(event, data) {{
-                        console.warn("HLS event error:", data);
-                        if (data.fatal) {{
-                            status.textContent = "Reconnecting...";
-                            status.style.color = "#FACC15";
-                            switch (data.type) {{
-                                case Hls.ErrorTypes.NETWORK_ERROR:
-                                    hls.startLoad();
-                                    break;
-                                case Hls.ErrorTypes.MEDIA_ERROR:
-                                    hls.recoverMediaError();
-                                    break;
-                                default:
-                                    setTimeout(function() {{ hls.loadSource(src); }}, 3000);
-                                    break;
-                            }}
+                        if (data.fatal && currentIdx < urls.length - 1) {{
+                            hls.destroy();
+                            currentIdx++;
+                            tryNextUrl();
                         }}
                     }});
-                }} else if (video.canPlayType('application/vnd.apple.mpegurl')) {{
-                    video.src = src;
-                    video.play().catch(function(){{}});
+                }} else if (currentIdx < urls.length - 1) {{
+                    currentIdx++;
+                    tryNextUrl();
                 }}
             }}
-            setTimeout(startHls, {stagger_ms});
+
+            function tryNextUrl() {{
+                var target = urls[currentIdx];
+                status.textContent = "Connecting (Node " + (currentIdx + 1) + ")...";
+                if (target.indexOf('.m3u8') !== -1) {{
+                    playHls(target);
+                }} else {{
+                    playDirect(target);
+                }}
+            }}
+
+            setTimeout(tryNextUrl, {stagger_ms});
         }})();
     </script>
     """
     components.html(player_html, height=height + 15, scrolling=False)
 
 
-def background_rtsp_ingest_worker(cam_obj, stop_event, sample_interval=1.8, yolo_model=None, ocr_reader=None):
-    """
-    Gujarat Police Hackathon 2026 Strict Live Stream Daemon (Zero Fallbacks):
-    1. Direct Ingestion from live RTSP/HTTP endpoints over TCP.
-    2. Exponential backoff (2.0s to 30.0s) reconnection on stream loss.
-    3. Hardware PTS extraction via cv2.CAP_PROP_POS_MSEC.
-    4. 100% Real-time inference on actual live frames only.
-    """
-    if isinstance(cam_obj, dict):
-        cam_id = str(cam_obj.get("cam_id", cam_obj.get("stream_id", "CAM-01")))
-        st_id = str(cam_obj.get("stream_id", "1"))
-        cam_name = cam_obj.get("name", "Checkpost")
-        cam_city = cam_obj.get("city", "Gujarat")
-        cam_lat = cam_obj.get("lat", 23.0)
-        cam_lon = cam_obj.get("lon", 72.5)
-    else:
-        st_id = str(cam_obj).strip()
-        cam_id = f"CAM-{int(st_id):02d}" if st_id.isdigit() else st_id
-        cam_name = f"Camera {st_id}"
-        cam_city = "Gujarat"
-        cam_lat, cam_lon = 23.0, 72.5
-        
-    if "-" in st_id and not st_id.startswith("JURY"):
-        st_id = st_id.split("-")[-1]
-    clean_id = str(int(st_id)) if st_id.isdigit() else st_id
+def start_camera_daemon(cam_obj=None):
+    pass
 
-    if yolo_model is None or ocr_reader is None:
-        try:
-            yolo_model, ocr_reader = get_ai_models()
-        except Exception:
-            pass
+def stop_camera_daemon(cid=None):
+    pass
 
-    backoff_delay = 2.0
-    max_backoff = 30.0
-    last_sample_time = 0.0
-    track_counter = 0
-
-    while not stop_event.is_set():
-        stream_urls_to_try = [
-            cam_obj.get("custom_url", "").strip() if isinstance(cam_obj, dict) else "",
-            get_active_stream_url(cam_obj),
-            
-            
-            f"http://127.0.0.1:8505/cam{int(clean_id):02d}/index.m3u8"
-        ]
-        stream_urls_to_try = [u for u in stream_urls_to_try if u]
-        
-        cap = None
-        for stream_url in stream_urls_to_try:
-            if stop_event.is_set():
-                break
-            try:
-                os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|allowed_media_types;video|fflags;nobuffer|flags;low_delay|timeout;1200"
-                temp_cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
-                if not temp_cap.isOpened():
-                    temp_cap = cv2.VideoCapture(stream_url)
-                if temp_cap.isOpened():
-                    cap = temp_cap
-                    break
-                else:
-                    if temp_cap is not None:
-                        temp_cap.release()
-            except Exception:
-                pass
-
-        if cap is None or not cap.isOpened():
-            # Exponential Backoff Reconnection (Mandatory Rule Compliance: 2s to 30s)
-            for _ in range(int(backoff_delay * 10)):
-                if stop_event.is_set():
-                    break
-                time.sleep(0.1)
-            backoff_delay = min(max_backoff, backoff_delay * 1.5)
-            continue
-
-        # Connected to live stream -> reset backoff delay
-        backoff_delay = 2.0
-        last_known_pts_ms = 0.0
-        try:
-            while not stop_event.is_set():
-                ret, frame = cap.read()
-                if not ret or frame is None or frame.size == 0:
-                    break
-
-                now = time.time()
-                if now - last_sample_time < sample_interval:
-                    time.sleep(0.01)
-                    continue
-
-                last_sample_time = now
-                fh, fw = frame.shape[:2]
-
-                raw_pts_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
-                if raw_pts_ms is not None and raw_pts_ms > 0:
-                    if raw_pts_ms < last_known_pts_ms - 2000:
-                        last_known_pts_ms = raw_pts_ms
-                    else:
-                        last_known_pts_ms = raw_pts_ms
-                    sec_pts = last_known_pts_ms / 1000.0
-                else:
-                    last_known_pts_ms += (sample_interval * 1000.0)
-                    sec_pts = last_known_pts_ms / 1000.0
-
-                pts_str = format_exact_pts(sec_pts)
-
-                detected_items = run_unified_ai_inference(yolo_model, ocr_reader, frame, imgsz=256, conf=0.35)
-                
-                for item in detected_items:
-                    cls = item["cls"]
-                    if cls in [2, 3, 5, 7]:
-                        top_p = item["plate"]
-                        top_c = item["ocr_conf"]
-                        conf_val = item["conf"]
-                        
-                        if top_p:
-                            formatted_plate = top_p
-                            egujcop_match = lookup_egujcop_record(top_p)
-                            egujcop_tag = f"CRITICAL eGujCop HIT: {egujcop_match['fir_no']} ({egujcop_match['offence']})" if egujcop_match else "Clear (No Active Warrant)"
-
-                            x1, y1, x2, y2 = item["box"]
-                            approx_speed = round(40.0 + ((y2 / max(1, fh)) * 32.0), 1)
-                            
-                            if approx_speed > 60.0:
-                                viol_type = f"Section 183 MV Act (Overspeeding {approx_speed} km/h in 60 zone)"
-                                fine_inr = 1500
-                            elif cls == 3 and (x2 - x1) > 60:
-                                viol_type = "Section 194C MV Act (Triple Riding Sentry)"
-                                fine_inr = 1000
-                            else:
-                                viol_type = "CLEAR"
-                                fine_inr = 0
-
-                            challan_id = f"ECH-GJ-{time.strftime('%Y%m')}-{track_counter:04d}" if fine_inr > 0 else "N/A"
-
-                            track_counter += 1
-                            event_payload = {
-                                "Event ID": f"SENTRY-{cam_id}-{track_counter:04d}",
-                                "Challan ID": challan_id,
-                                "Entry Time": pts_str,
-                                "Exit Time": pts_str,
-                                "Peak Clarity Time": pts_str,
-                                "Duration": f"{round(sec_pts, 1)}s (PTS)",
-                                "PTS Seconds": sec_pts,
-                                "Vehicle Type": CLASS_NAMES.get(cls, "Vehicle"),
-                                "Vehicle Class": CLASS_NAMES.get(cls, "Vehicle"),
-                                "Event Type": "AUTONOMOUS SENTRY SIGHTING",
-                                "Consensus Plate / Details": f"License Plate: [{formatted_plate}]",
-                                "Detected Plate": formatted_plate,
-                                "Speed_kmh": approx_speed,
-                                "Speed": f"{approx_speed} km/h",
-                                "Violation": viol_type,
-                                "Penalty_INR": fine_inr,
-                                "Fine": f"₹{fine_inr}" if fine_inr > 0 else "None",
-                                "FRS_Match": "No Biometric Alert",
-                                "Match Confidence": f"{round(top_c * 100, 1)}%",
-                                "YOLO Confidence": f"{round(float(conf_val) * 100, 1)}%",
-                                "OCR Confidence": f"{round(top_c * 100, 1)}%",
-                                "Checkpost Location": f"{cam_id}: {cam_name} ({cam_city})",
-                                "City": cam_city,
-                                "Lat": cam_lat,
-                                "Lon": cam_lon,
-                                "Plate_Clean": clean_str(top_p),
-                                "eGujCop Status": egujcop_tag,
-                                "Source": f"Autonomous Sentry ({cam_id})"
-                            }
-
-                            with GLOBAL_SIGHTINGS_LOCK:
-                                is_duplicate = False
-                                for prev_s in GLOBAL_SIGHTINGS_BUFFER[-15:]:
-                                    if prev_s.get("Plate_Clean") == clean_str(top_p) and prev_s.get("Checkpost Location") == event_payload["Checkpost Location"]:
-                                        is_duplicate = True
-                                        break
-                                if not is_duplicate:
-                                    GLOBAL_SIGHTINGS_BUFFER.append(event_payload)
-                                    log_sighting_to_db(event_payload)
-
-                time.sleep(0.01)
-        finally:
-            if cap is not None:
-                try:
-                    cap.release()
-                except Exception:
-                    pass
-                cap = None
-
-def start_camera_daemon(cam_obj):
-    cid = cam_obj.get("cam_id", cam_obj.get("stream_id", "CAM-01")) if isinstance(cam_obj, dict) else str(cam_obj)
-    
-    try:
-        yolo_model, ocr_reader = get_ai_models()
-    except Exception:
-        yolo_model, ocr_reader = None, None
-
-    with DAEMON_REGISTRY_LOCK:
-        if cid in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS[cid].is_alive():
-            return
-        
-        alive_cids = [c for c, t in list(ACTIVE_DAEMON_THREADS.items()) if t.is_alive()]
-        if len(alive_cids) >= MAX_CONCURRENT_DAEMONS:
-            oldest_cid = alive_cids[0]
-            if oldest_cid in DAEMON_STOP_EVENTS:
-                DAEMON_STOP_EVENTS[oldest_cid].set()
-            if oldest_cid in ACTIVE_DAEMON_THREADS:
-                del ACTIVE_DAEMON_THREADS[oldest_cid]
-            time.sleep(0.05)
-
-        stop_event = threading.Event()
-        DAEMON_STOP_EVENTS[cid] = stop_event
-        t = threading.Thread(
-            target=background_rtsp_ingest_worker, 
-            args=(cam_obj, stop_event, 1.8, yolo_model, ocr_reader), 
-            daemon=True
-        )
-        if add_script_run_ctx:
-            try:
-                add_script_run_ctx(t)
-            except Exception:
-                pass
-        ACTIVE_DAEMON_THREADS[cid] = t
-        t.start()
-
-
-def stop_camera_daemon(cid):
-    with DAEMON_REGISTRY_LOCK:
-        if cid in DAEMON_STOP_EVENTS:
-            DAEMON_STOP_EVENTS[cid].set()
-        if cid in ACTIVE_DAEMON_THREADS:
-            try:
-                del ACTIVE_DAEMON_THREADS[cid]
-            except Exception:
-                pass
 # ----------------- GUJARAT HIGHWAY TOPOLOGY CORRIDOR ROUTING -----------------
 def compute_predictive_trajectory(sightings_list):
     if len(sightings_list) < 2:
@@ -3718,39 +3502,6 @@ else:
     st.sidebar.caption("⚪ **Standard Mode:** Full HD 8.4 Mbps Video Stream Decoded")
 
 # ----------------- DYNAMIC JURY / RTSP STREAM OVERRIDE WIDGET -----------------
-st.sidebar.markdown("### 📡 Zero-Delay RTSP Ingest Daemons")
-col_d1, col_d2 = st.sidebar.columns(2)
-
-cam14_obj = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == "14"), ACTIVE_CCTV_CATALOGUE[0])
-cam01_obj = next((c for c in ACTIVE_CCTV_CATALOGUE if str(c['stream_id']) == "1"), ACTIVE_CCTV_CATALOGUE[0])
-
-with DAEMON_REGISTRY_LOCK:
-    is_c14_alive = "CAM-14" in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS["CAM-14"].is_alive()
-    is_c01_alive = "CAM-01" in ACTIVE_DAEMON_THREADS and ACTIVE_DAEMON_THREADS["CAM-01"].is_alive()
-
-# Persistent Toggle Switches
-with col_d1:
-    t_c14 = st.toggle("🟢 CAM-14", value=is_c14_alive, key="daemon_toggle_cam14")
-    if t_c14 != is_c14_alive:
-        if t_c14:
-            start_camera_daemon(cam14_obj)
-        else:
-            stop_camera_daemon("CAM-14")
-        st.rerun()
-
-with col_d2:
-    t_c01 = st.toggle("🟢 CAM-01", value=is_c01_alive, key="daemon_toggle_cam01")
-    if t_c01 != is_c01_alive:
-        if t_c01:
-            start_camera_daemon(cam01_obj)
-        else:
-            stop_camera_daemon("CAM-01")
-        st.rerun()
-
-with DAEMON_REGISTRY_LOCK:
-    active_daemon_count = len([t for t in ACTIVE_DAEMON_THREADS.values() if t.is_alive()])
-
-# Always sync global buffer to session sightings
 with GLOBAL_SIGHTINGS_LOCK:
     for item in GLOBAL_SIGHTINGS_BUFFER:
         if item not in st.session_state["all_cctv_sightings"]:
@@ -4053,7 +3804,7 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
                 render_cctv_live_container(selected_cam, height=480, border_color="rgba(134,239,172,0.9)")
 
                 # Auto-start autonomous background sentry daemon for active checkpost
-        start_camera_daemon(selected_cam)
+        # Camera daemon removed for clean on-demand inference
 
         # ----------------- 24/7 AUTONOMOUS SENTRY & AUTO E-CHALLAN COMMAND DECK -----------------
         st.markdown("""
@@ -4170,41 +3921,6 @@ elif nav_section == "Gujarat 25 CCTV Live Network":
         with c_ai_btn:
             st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
             run_live_inference = st.button("⚡ EXECUTE AI SCAN (1-CLICK)", type="primary", use_container_width=True, key=f"btn_run_live_ai_{selected_cam.get('cam_id', 'custom')}")
-            continuous_radar = st.toggle("📡 Continuous Live AI Radar Loop", value=False, key=f"toggle_cont_radar_{selected_cam.get('cam_id', 'custom')}")
-
-        if continuous_radar:
-            radar_feed_ph = st.empty()
-            radar_info_ph = st.empty()
-            yolo_model, ocr_reader = get_ai_models()
-            clean_tgt = clean_str(target_watch_plate)
-            
-            for loop_i in range(80):
-                ret, frame = capture_live_frame_from_stream(selected_cam)
-                if not ret or frame is None:
-                    break
-                    
-                fh, fw = frame.shape[:2]
-                annotated_f = frame.copy()
-                items = run_unified_ai_inference(yolo_model, ocr_reader, frame, imgsz=256, conf=0.3)
-                
-                v_count = 0
-                p_count = 0
-                for item in items:
-                    cls = item["cls"]
-                    x1, y1, x2, y2 = item["box"]
-                    p_text = item["plate"]
-                    if cls == 0:
-                        p_count += 1
-                        cv2.rectangle(annotated_f, (x1, y1), (x2, y2), (255, 120, 0), 2)
-                    elif cls in [2, 3, 5, 7]:
-                        v_count += 1
-                        cv2.rectangle(annotated_f, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        lbl = f"{CLASS_NAMES.get(cls, 'Vehicle')}: {p_text or 'Logged'}"
-                        cv2.putText(annotated_f, lbl, (x1, max(15, y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        
-                radar_feed_ph.image(cv2.cvtColor(annotated_f, cv2.COLOR_BGR2RGB), caption=f"📡 Continuous Live AI Stream Radar | Node: {selected_cam['name']} | Frame #{loop_i+1}", use_container_width=True)
-                radar_info_ph.info(f"● Active Radar Loop: {v_count} Vehicles | {p_count} Pedestrians | Hardware PTS Sync: ONLINE")
-                time.sleep(0.04)
 
         if run_live_inference:
             with st.spinner(f"⚡ Processing Live AI Frame: {selected_ai_task}..."):
