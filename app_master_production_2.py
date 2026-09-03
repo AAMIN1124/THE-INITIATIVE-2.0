@@ -107,11 +107,14 @@ def get_sentinel_opener():
 
 CURRENT_SCREEN_FRAMES = {}
 CURRENT_SCREEN_FRAME_LOCK = threading.RLock()
+CURRENT_PLAYBACK_TIMESTAMPS = {}
+LAST_SYNC_WALL_TIME = {}
+LATEST_LIVE_SEGMENTS_CACHE = {}
 LATEST_DECRYPTED_LIVE_FRAME = {}
 LATEST_LIVE_AES_KEY = None
 LATEST_LIVE_FRAME_LOCK = threading.RLock()
 
-def decode_ts_segment_to_frame(ts_bytes, key_bytes):
+def decode_ts_segment_to_frame(ts_bytes, key_bytes, frame_seek_ratio=0.5):
     try:
         from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
         iv = b'\x00' * 16
@@ -123,6 +126,11 @@ def decode_ts_segment_to_frame(ts_bytes, key_bytes):
             f.write(dec)
         
         cap = cv2.VideoCapture(tmp_p)
+        total_f = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if total_f > 1:
+            target_f = max(0, min(total_f - 1, int(total_f * frame_seek_ratio)))
+            cap.set(cv2.CAP_PROP_POS_FRAMES, target_f)
+            
         ret, frame = cap.read()
         cap.release()
         if ret and frame is not None and frame.size > 0:
@@ -180,6 +188,28 @@ class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         clean_path = self.path.split('?')[0].lstrip('/')
+        
+        # 1. Real-Time Screen Playback Time Sync endpoint
+        if 'sync_playback' in clean_path:
+            try:
+                query = urllib.parse.urlparse(self.path).query
+                params = urllib.parse.parse_qs(query)
+                cam_id = params.get('cam', ['14'])[0]
+                t_val = float(params.get('t', ['0'])[0])
+                with CURRENT_SCREEN_FRAME_LOCK:
+                    CURRENT_PLAYBACK_TIMESTAMPS[cam_id] = t_val
+                    CURRENT_PLAYBACK_TIMESTAMPS[f"cam{int(cam_id):02d}" if cam_id.isdigit() else cam_id] = t_val
+                    CURRENT_PLAYBACK_TIMESTAMPS["latest"] = t_val
+                    LAST_SYNC_WALL_TIME[cam_id] = time.time()
+                    LAST_SYNC_WALL_TIME["latest"] = time.time()
+                self.send_response(200)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(b'OK')
+                return
+            except Exception:
+                pass
+
         opener = get_sentinel_opener()
         remote_url = f'https://cctv.corp8.cloud/{clean_path}'
 
@@ -206,6 +236,15 @@ class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
                 global LATEST_LIVE_AES_KEY
                 if 'enc.key' in clean_path:
                     LATEST_LIVE_AES_KEY = content
+                elif clean_path.endswith('.ts'):
+                    # Cache the active segment requested by browser Hls.js in real time!
+                    cam_prefix = clean_path.split('/')[0]
+                    with CURRENT_SCREEN_FRAME_LOCK:
+                        LATEST_LIVE_SEGMENTS_CACHE[cam_prefix] = content
+                        num_part = "".join(filter(str.isdigit, cam_prefix))
+                        if num_part:
+                            LATEST_LIVE_SEGMENTS_CACHE[str(int(num_part))] = content
+                            LATEST_LIVE_SEGMENTS_CACHE["latest"] = content
         except Exception as e:
             self.send_response(500)
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -757,16 +796,36 @@ def capture_live_frame_from_stream(cam_dict):
 
     cam_folder = f"cam{int(clean_id):02d}" if clean_id.isdigit() else f"cam{clean_id}"
 
-    # 1. First priority: Exact active on-screen frame synchronized from the browser player!
+    # Priority 1: Exact active on-screen frame synchronized from the browser canvas!
     with CURRENT_SCREEN_FRAME_LOCK:
-        if clean_id in CURRENT_SCREEN_FRAMES:
-            return True, CURRENT_SCREEN_FRAMES[clean_id].copy()
-        if cam_folder in CURRENT_SCREEN_FRAMES:
-            return True, CURRENT_SCREEN_FRAMES[cam_folder].copy()
-        if "latest" in CURRENT_SCREEN_FRAMES:
-            return True, CURRENT_SCREEN_FRAMES["latest"].copy()
+        for k in [clean_id, cam_folder, "latest"]:
+            if k in CURRENT_SCREEN_FRAMES and CURRENT_SCREEN_FRAMES[k] is not None:
+                return True, CURRENT_SCREEN_FRAMES[k].copy()
 
-    # 2. If custom RTSP / HTTP URL provided by user
+    # Priority 2: Exact active segment currently being played by the browser!
+    with CURRENT_SCREEN_FRAME_LOCK:
+        active_seg_bytes = LATEST_LIVE_SEGMENTS_CACHE.get(cam_folder, LATEST_LIVE_SEGMENTS_CACHE.get(clean_id, LATEST_LIVE_SEGMENTS_CACHE.get("latest")))
+
+    opener = get_sentinel_opener()
+    global LATEST_LIVE_AES_KEY
+    if LATEST_LIVE_AES_KEY is None:
+        try:
+            req_k = urllib.request.Request("https://cctv.corp8.cloud/enc.key", headers={"User-Agent": "Mozilla/5.0"})
+            LATEST_LIVE_AES_KEY = opener.open(req_k, timeout=6.0).read()
+        except Exception:
+            pass
+
+    if active_seg_bytes and LATEST_LIVE_AES_KEY:
+        # Seek ratio based on current playback second
+        cur_t = CURRENT_PLAYBACK_TIMESTAMPS.get(clean_id, CURRENT_PLAYBACK_TIMESTAMPS.get("latest", 0.0))
+        ratio = (cur_t % 6.0) / 6.0
+        live_frame = decode_ts_segment_to_frame(active_seg_bytes, LATEST_LIVE_AES_KEY, frame_seek_ratio=ratio)
+        if live_frame is not None and live_frame.size > 0:
+            with CURRENT_SCREEN_FRAME_LOCK:
+                CURRENT_SCREEN_FRAMES[clean_id] = live_frame
+            return True, live_frame
+
+    # Priority 3: Custom RTSP / HTTP URL
     if custom_url and custom_url.startswith(("rtsp://", "http://", "https://")):
         try:
             os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|stimeout;1000000"
@@ -781,33 +840,17 @@ def capture_live_frame_from_stream(cam_dict):
         except Exception:
             pass
 
-    # 3. Dynamic live segment grabber from Government Portal matching current live wall-clock
-    opener = get_sentinel_opener()
+    # Priority 4: Dynamic segment calculated from timeline or playback timestamp
     try:
-        global LATEST_LIVE_AES_KEY
-        if LATEST_LIVE_AES_KEY is None:
-            req_k = urllib.request.Request("https://cctv.corp8.cloud/enc.key", headers={"User-Agent": "Mozilla/5.0"})
-            LATEST_LIVE_AES_KEY = opener.open(req_k, timeout=6.0).read()
-
-        seg_idx = int(time.time() / 6) % 7190
+        cur_t = CURRENT_PLAYBACK_TIMESTAMPS.get(clean_id, (time.time() * 2.5) % 3600)
+        seg_idx = int(cur_t / 6.0)
         seg_name = f"seg{seg_idx:05d}.ts"
-        
         req_s = urllib.request.Request(f"https://cctv.corp8.cloud/{cam_folder}/{seg_name}", headers={"User-Agent": "Mozilla/5.0"})
         seg_bytes = opener.open(req_s, timeout=7.0).read()
-
-        live_frame = decode_ts_segment_to_frame(seg_bytes, LATEST_LIVE_AES_KEY)
+        live_frame = decode_ts_segment_to_frame(seg_bytes, LATEST_LIVE_AES_KEY, frame_seek_ratio=(cur_t % 6.0) / 6.0)
         if live_frame is not None and live_frame.size > 0:
             with CURRENT_SCREEN_FRAME_LOCK:
                 CURRENT_SCREEN_FRAMES[clean_id] = live_frame
-            return True, live_frame
-    except Exception:
-        pass
-
-    try:
-        req_s = urllib.request.Request(f"https://cctv.corp8.cloud/{cam_folder}/seg00000.ts", headers={"User-Agent": "Mozilla/5.0"})
-        seg_bytes = opener.open(req_s, timeout=7.0).read()
-        live_frame = decode_ts_segment_to_frame(seg_bytes, LATEST_LIVE_AES_KEY)
-        if live_frame is not None and live_frame.size > 0:
             return True, live_frame
     except Exception:
         pass
@@ -3115,7 +3158,7 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             <div class="hud-badge">🔴 GOV LIVE • {cam_id_tag}</div>
             <div class="hud-clock" id="clock_{dom_id}">--:--:-- IST</div>
             <div class="hud-status" id="stat_{dom_id}">● LIVE HLS STREAMING</div>
-            <video id="{dom_id}" autoplay muted playsinline loop crossorigin="anonymous"></video>
+                        <video id="{dom_id}" autoplay muted playsinline loop crossorigin="anonymous"></video>
         </div>
         <script>
             (function() {{
@@ -3132,6 +3175,43 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
                 setInterval(updateClock, 500);
                 updateClock();
 
+                // Live Active Screen Synchronizer (Reports exact playback second & on-screen frame)
+                var syncCanvas = document.createElement('canvas');
+                var isSyncing = false;
+                function syncLiveScreen() {{
+                    if (v.paused || v.ended) return;
+                    var curT = v.currentTime || 0;
+                    
+                    // 1. Report exact playback timestamp (Never fails, zero CORS overhead)
+                    try {{
+                        navigator.sendBeacon('http://127.0.0.1:8505/sync_playback?cam={clean_id}&t=' + curT.toFixed(2));
+                    }} catch(e) {{
+                        fetch('http://127.0.0.1:8505/sync_playback?cam={clean_id}&t=' + curT.toFixed(2), {{mode: 'no-cors'}}).catch(function(){{}});
+                    }}
+
+                    // 2. Report exact visual pixel canvas
+                    if (!isSyncing && v.videoWidth > 0) {{
+                        try {{
+                            isSyncing = true;
+                            syncCanvas.width = v.videoWidth;
+                            syncCanvas.height = v.videoHeight;
+                            var ctx = syncCanvas.getContext('2d');
+                            ctx.drawImage(v, 0, 0, syncCanvas.width, syncCanvas.height);
+                            var dataUrl = syncCanvas.toDataURL('image/jpeg', 0.85);
+                            fetch('http://127.0.0.1:8505/sync_screen_frame?cam_id={clean_id}', {{
+                                method: 'POST',
+                                headers: {{'Content-Type': 'text/plain'}},
+                                body: dataUrl
+                            }}).finally(function() {{
+                                isSyncing = false;
+                            }});
+                        }} catch(err) {{
+                            isSyncing = false;
+                        }}
+                    }}
+                }}
+                setInterval(syncLiveScreen, 250);
+
                 if (Hls.isSupported()) {{
                     var hls = new Hls({{
                         enableWorker: true,
@@ -3145,31 +3225,6 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
                         stat.textContent = '● 25 FPS • GOV LIVE';
                         stat.style.color = '#4ADE80';
                     }});
-
-                    // Active Screen Frame Synchronizer (Captures EXACT live frame playing on screen)
-                    var syncCanvas = document.createElement('canvas');
-                    var isSyncing = false;
-                    function syncCurrentScreen() {{
-                        if (isSyncing || v.paused || v.ended || !v.videoWidth) return;
-                        try {{
-                            isSyncing = true;
-                            syncCanvas.width = v.videoWidth;
-                            syncCanvas.height = v.videoHeight;
-                            var sCtx = syncCanvas.getContext('2d');
-                            sCtx.drawImage(v, 0, 0, syncCanvas.width, syncCanvas.height);
-                            var dataUrl = syncCanvas.toDataURL('image/jpeg', 0.85);
-                            fetch('http://127.0.0.1:8505/sync_screen_frame?cam_id=' + encodeURIComponent('{clean_id}'), {{
-                                method: 'POST',
-                                headers: {{'Content-Type': 'text/plain'}},
-                                body: dataUrl
-                            }}).finally(function() {{
-                                isSyncing = false;
-                            }});
-                        }} catch(err) {{
-                            isSyncing = false;
-                        }}
-                    }}
-                    setInterval(syncCurrentScreen, 300);
                     hls.on(Hls.Events.ERROR, function(event, data) {{
                         if (data.fatal) {{
                             switch(data.type) {{
