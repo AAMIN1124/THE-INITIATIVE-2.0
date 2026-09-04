@@ -3174,8 +3174,8 @@ def classify_rider_helmet(head_crop):
 # ----------------- 100% GENUINE LIVE CCTV STREAM RENDERING ENGINE -----------------
 def get_active_stream_url(identifier):
     """
-    Safely retrieves the active HLS / RTSP / MP4 stream URL via the local proxy.
-    Bypasses CORS, cookie restrictions, and player stalls.
+    Safely retrieves the active stream URL for dict, string, int, or custom IP streams.
+    Prevents AttributeError when passing string IDs.
     """
     if not identifier:
         return "https://live.corp8.cloud/stream/14"
@@ -3199,19 +3199,11 @@ def get_active_stream_url(identifier):
         
     if st_id in overrides and str(overrides[st_id]).strip():
         return str(overrides[st_id]).strip()
-    if st_id.startswith("JURY") and st_id in overrides:
-        return str(overrides[st_id]).strip()
     if st_id == "JURY" and "JURY" in overrides:
         return str(overrides["JURY"]).strip()
     
-    if st_id.isdigit():
-        cam_key = f"cam{int(st_id):02d}"
-    elif st_id.lower().startswith("cam"):
-        cam_key = st_id.lower()
-    else:
-        cam_key = f"cam{st_id}"
-        
-    return f"https://live.corp8.cloud/stream/{st_id}"
+    clean_num = str(int(st_id)) if st_id.isdigit() else st_id
+    return f"https://live.corp8.cloud/stream/{clean_num}"
 
 
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
@@ -3225,176 +3217,62 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             {"stream_id": st_id, "cam_id": f"CAM-{int(st_id):02d}" if st_id.isdigit() else st_id, "name": f"Camera {st_id}", "city": "Gujarat", "dept": "Traffic Branch", "status": "ONLINE"}
         )
     
-    clean_id = st_id.split("-")[-1] if "-" in st_id else st_id
-    if clean_id.isdigit():
-        clean_id = str(int(clean_id))
-    cam_id_tag = cam_dict.get("cam_id", f"CAM-{clean_id}")
-    cam_num = f"{int(clean_id):02d}" if clean_id.isdigit() else clean_id
-    cam_target_id = f"cam{cam_num}"
+    if "-" in st_id and not st_id.startswith("JURY"):
+        st_id = st_id.split("-")[-1]
+    clean_id = str(int(st_id)) if st_id.isdigit() else st_id
+    
+    video_src = get_active_stream_url(cam_dict)
+    cam_id_tag = cam_dict.get("cam_id", f"CAM-{int(clean_id):02d}" if clean_id.isdigit() else clean_id)
+    badge_html = f"""<div style="position:absolute;top:10px;left:10px;background:rgba(239,68,68,0.95);color:#FFFFFF;padding:4px 10px;border-radius:6px;font-size:0.75rem;font-weight:800;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);letter-spacing:0.5px;font-family:monospace;">🔴 LIVE • {cam_id_tag}</div>"""
 
-    dom_id = f"cctv_live_{clean_id}"
-
-    player_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-        <style>
-            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-            body {{ background: #000000; overflow: hidden; font-family: monospace; }}
-            .vid-card {{
-                position: relative;
-                width: 100%;
-                height: {height}px;
-                background: #050B18;
-                border-radius: 14px;
-                border: 2px solid {border_color};
-                overflow: hidden;
-                box-shadow: 0 6px 22px rgba(0,0,0,0.5);
-            }}
-            .hud-badge {{
-                position: absolute;
-                top: 10px;
-                left: 10px;
-                background: rgba(220, 38, 38, 0.95);
-                color: #FFFFFF;
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-size: 11px;
-                font-weight: 800;
-                letter-spacing: 0.5px;
-                z-index: 10;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-            }}
-            .hud-clock {{
-                position: absolute;
-                top: 10px;
-                right: 10px;
-                background: rgba(15, 23, 42, 0.85);
-                color: #38BDF8;
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-size: 11px;
-                font-weight: 700;
-                z-index: 10;
-                border: 1px solid rgba(56, 189, 248, 0.3);
-            }}
-            .hud-status {{
-                position: absolute;
-                bottom: 8px;
-                right: 10px;
-                background: rgba(15, 23, 42, 0.85);
-                color: #4ADE80;
-                padding: 3px 8px;
-                border-radius: 5px;
-                font-size: 10.5px;
-                font-weight: 700;
-                z-index: 10;
-                border: 1px solid rgba(74, 222, 128, 0.3);
-            }}
-            video {{
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-                display: block;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="vid-card">
-            <div class="hud-badge">🔴 GOV LIVE • {cam_id_tag}</div>
-            <div class="hud-clock" id="clock_{dom_id}">--:--:-- IST</div>
-            <div class="hud-status" id="stat_{dom_id}">● LIVE HLS STREAMING</div>
-                                    <div id="player_wrap_{dom_id}" style="width: 100%; height: 100%; position: relative;">
-                <video id="{dom_id}" autoplay muted playsinline loop crossorigin="anonymous"></video>
-            </div>
-        </div>
-        <script>
-            (function() {{
-                var v = document.getElementById('{dom_id}');
-                var wrap = document.getElementById('player_wrap_{dom_id}');
-                var clk = document.getElementById('clock_{dom_id}');
-                var stat = document.getElementById('stat_{dom_id}');
-
-                function updateClock() {{
-                    var now = new Date(Date.now() + 19800000);
-                    var pad = function(n) {{ return String(n).padStart(2, '0'); }};
-                    clk.textContent = pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ':' + pad(now.getUTCSeconds()) + ' IST';
+    style_extra = "image-rendering: crisp-edges; filter: contrast(120%) brightness(95%);" if is_dual_main else ""
+    dom_id = f"vid_feed_{clean_id}"
+    
+    full_html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{ background: transparent; overflow: hidden; }}
+    .vid-box {{ position: relative; width: 100%; height: {height}px; overflow: hidden; border-radius: 14px; border: 1.5px solid {border_color}; box-shadow: 0 6px 20px rgba(14,165,233,0.12); background: #000; }}
+    video {{ width: 100%; height: {height}px; object-fit: cover; border-radius: 14px; background: #000; {style_extra} }}
+</style>
+</head>
+<body>
+<div class="vid-box">
+    <video id="{dom_id}" autoplay muted playsinline controls preload="auto" loop src="{video_src}"></video>
+    {badge_html}
+</div>
+<script>
+    (function() {{
+        var v = document.getElementById('{dom_id}');
+        var delay = {stagger_ms};
+        function start() {{
+            try {{
+                v.muted = true;
+                var p = v.play();
+                if (p !== undefined) {{
+                    p.catch(function() {{
+                        setTimeout(function() {{ v.play().catch(function(){{}}); }}, 200);
+                    }});
                 }}
-                setInterval(updateClock, 500);
-                updateClock();
+            }} catch(e) {{}}
+        }}
+        if (delay > 0) {{
+            setTimeout(start, delay);
+        }} else {{
+            start();
+        }}
+    }})();
+</script>
+</body>
+</html>"""
 
-                // Detect if running on remote Streamlit Cloud or Localhost
-                var isCloud = (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1'));
-
-                if (isCloud) {{
-                    // Streamlit Cloud Mode: Directly embed authorized Government CCTV Portal
-                    stat.textContent = '● GOV CLOUD MESH ONLINE';
-                    stat.style.color = '#38BDF8';
-                    wrap.innerHTML = '<iframe src="https://cctv.corp8.cloud/" style="width: 100%; height: 100%; border: none; border-radius: 12px; background: #000;" allow="autoplay; fullscreen"></iframe>';
-                }} else {{
-                    // Localhost Mode: High-performance HLS proxy on port 8505 with active screen sync
-                    var m3u8_url = 'http://127.0.0.1:8505/{cam_target_id}/index.m3u8';
-
-                    var syncCanvas = document.createElement('canvas');
-                    var isSyncing = false;
-                    function syncLiveScreen() {{
-                        if (v.paused || v.ended) return;
-                        var curT = v.currentTime || 0;
-                        try {{
-                            navigator.sendBeacon('http://127.0.0.1:8505/sync_playback?cam={clean_id}&t=' + curT.toFixed(2));
-                        }} catch(e) {{
-                            fetch('http://127.0.0.1:8505/sync_playback?cam={clean_id}&t=' + curT.toFixed(2), {{mode: 'no-cors'}}).catch(function(){{}});
-                        }}
-
-                        if (!isSyncing && v.videoWidth > 0) {{
-                            try {{
-                                isSyncing = true;
-                                syncCanvas.width = v.videoWidth;
-                                syncCanvas.height = v.videoHeight;
-                                var ctx = syncCanvas.getContext('2d');
-                                ctx.drawImage(v, 0, 0, syncCanvas.width, syncCanvas.height);
-                                var dataUrl = syncCanvas.toDataURL('image/jpeg', 0.85);
-                                fetch('http://127.0.0.1:8505/sync_screen_frame?cam_id={clean_id}', {{
-                                    method: 'POST',
-                                    headers: {{'Content-Type': 'text/plain'}},
-                                    body: dataUrl
-                                }}).finally(function() {{ isSyncing = false; }});
-                            }} catch(err) {{ isSyncing = false; }}
-                        }}
-                    }}
-                    setInterval(syncLiveScreen, 250);
-
-                    if (Hls.isSupported()) {{
-                        var hls = new Hls({{ enableWorker: true, lowLatencyMode: true, backBufferLength: 10 }});
-                        hls.loadSource(m3u8_url);
-                        hls.attachMedia(v);
-                        hls.on(Hls.Events.MANIFEST_PARSED, function() {{
-                            v.play().catch(function(){{}});
-                            stat.textContent = '● 25 FPS • GOV LIVE';
-                            stat.style.color = '#4ADE80';
-                        }});
-                        hls.on(Hls.Events.ERROR, function(event, data) {{
-                            if (data.fatal) {{
-                                switch(data.type) {{
-                                    case Hls.ErrorTypes.NETWORK_ERROR: hls.startLoad(); break;
-                                    case Hls.ErrorTypes.MEDIA_ERROR: hls.recoverMediaError(); break;
-                                    default: hls.destroy(); break;
-                                }}
-                            }}
-                        }});
-                    }} else if (v.canPlayType('application/vnd.apple.mpegurl')) {{
-                        v.src = m3u8_url;
-                        v.play().catch(function(){{}});
-                    }}
-                }}
-            }})();
-        </script>
-    </body>
-    </html>
-    """
-    components.html(player_html, height=height + 15, scrolling=False)
+    try:
+        components.html(full_html, height=height + 15)
+    except Exception:
+        st.markdown(full_html, unsafe_allow_html=True)
 
 
 def start_camera_daemon(cam_obj=None):
