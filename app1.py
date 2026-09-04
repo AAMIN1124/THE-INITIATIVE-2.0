@@ -199,13 +199,15 @@ import urllib.request
 import urllib.parse
 import http.cookiejar
 import ssl
-# cv2 already safely loaded
 import numpy as np
 
 PROXY_PORT = 8505
 SENTINEL_PROXY_SERVER = None
 SENTINEL_SESSION_OPENER = None
 SENTINEL_AUTH_LOCK = threading.RLock()
+PLAYLIST_CACHE = {}
+PLAYLIST_CACHE_LOCK = threading.RLock()
+LATEST_LIVE_AES_KEY = None
 
 def get_sentinel_opener():
     global SENTINEL_SESSION_OPENER
@@ -222,13 +224,22 @@ def get_sentinel_opener():
             req = urllib.request.Request(
                 'https://cctv.corp8.cloud/auth/login',
                 data=login_data,
-                headers={'User-Agent': 'Mozilla/5.0'}
+                headers={'User-Agent': 'Mozilla/5.0', 'Connection': 'close'}
             )
-            opener.open(req, timeout=7.0)
+            opener.open(req, timeout=45.0)
         except Exception:
             pass
         SENTINEL_SESSION_OPENER = opener
         return SENTINEL_SESSION_OPENER
+
+# Background session pre-warmer: authenticates Government gateway proactively
+def prewarm_sentinel_gateway():
+    try:
+        get_sentinel_opener()
+    except Exception:
+        pass
+
+threading.Thread(target=prewarm_sentinel_gateway, daemon=True).start()
 
 CURRENT_SCREEN_FRAMES = {}
 CURRENT_SCREEN_FRAME_LOCK = threading.RLock()
@@ -236,7 +247,6 @@ CURRENT_PLAYBACK_TIMESTAMPS = {}
 LAST_SYNC_WALL_TIME = {}
 LATEST_LIVE_SEGMENTS_CACHE = {}
 LATEST_DECRYPTED_LIVE_FRAME = {}
-LATEST_LIVE_AES_KEY = None
 LATEST_LIVE_FRAME_LOCK = threading.RLock()
 
 def decode_ts_segment_to_frame(ts_bytes, key_bytes, frame_seek_ratio=0.5):
@@ -258,6 +268,8 @@ def decode_ts_segment_to_frame(ts_bytes, key_bytes, frame_seek_ratio=0.5):
             
         ret, frame = cap.read()
         cap.release()
+        try: os.remove(tmp_p)
+        except Exception: pass
         if ret and frame is not None and frame.size > 0:
             return frame
     except Exception:
@@ -314,7 +326,7 @@ class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         clean_path = self.path.split('?')[0].lstrip('/')
         
-        # 1. Real-Time Screen Playback Time Sync endpoint
+        # Real-Time Screen Playback Time Sync endpoint
         if 'sync_playback' in clean_path:
             try:
                 query = urllib.parse.urlparse(self.path).query
@@ -335,12 +347,38 @@ class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
             except Exception:
                 pass
 
+        # Serve cached AES encryption key instantly
+        global LATEST_LIVE_AES_KEY
+        if 'enc.key' in clean_path and LATEST_LIVE_AES_KEY is not None:
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Content-Length', str(len(LATEST_LIVE_AES_KEY)))
+            self.end_headers()
+            self.wfile.write(LATEST_LIVE_AES_KEY)
+            return
+
+        # Serve cached m3u8 playlist if fresh (< 8 seconds)
+        now_ts = time.time()
+        if 'm3u8' in clean_path:
+            with PLAYLIST_CACHE_LOCK:
+                if clean_path in PLAYLIST_CACHE:
+                    cached_data, cached_exp = PLAYLIST_CACHE[clean_path]
+                    if now_ts < cached_exp:
+                        self.send_response(200)
+                        self.send_header('Access-Control-Allow-Origin', '*')
+                        self.send_header('Content-Type', 'application/vnd.apple.mpegurl')
+                        self.send_header('Content-Length', str(len(cached_data)))
+                        self.end_headers()
+                        self.wfile.write(cached_data)
+                        return
+
         opener = get_sentinel_opener()
         remote_url = f'https://cctv.corp8.cloud/{clean_path}'
 
         try:
-            req = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with opener.open(req, timeout=10.0) as remote_resp:
+            req = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0', 'Connection': 'close'})
+            with opener.open(req, timeout=30.0) as remote_resp:
                 content = remote_resp.read()
                 ct = remote_resp.headers.get('Content-Type', 'application/octet-stream')
 
@@ -350,19 +388,12 @@ class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
                     text = text.replace('URI="enc.key"', f'URI="http://127.0.0.1:{PROXY_PORT}/enc.key"')
                     content = text.encode('utf-8')
                     ct = 'application/vnd.apple.mpegurl'
+                    with PLAYLIST_CACHE_LOCK:
+                        PLAYLIST_CACHE[clean_path] = (content, now_ts + 8.0)
 
-                self.send_response(200)
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.send_header('Content-Type', ct)
-                self.send_header('Content-Length', str(len(content)))
-                self.end_headers()
-                self.wfile.write(content)
-
-                global LATEST_LIVE_AES_KEY
                 if 'enc.key' in clean_path:
                     LATEST_LIVE_AES_KEY = content
                 elif clean_path.endswith('.ts'):
-                    # Cache the active segment requested by browser Hls.js in real time!
                     cam_prefix = clean_path.split('/')[0]
                     with CURRENT_SCREEN_FRAME_LOCK:
                         LATEST_LIVE_SEGMENTS_CACHE[cam_prefix] = content
@@ -370,12 +401,18 @@ class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
                         if num_part:
                             LATEST_LIVE_SEGMENTS_CACHE[str(int(num_part))] = content
                             LATEST_LIVE_SEGMENTS_CACHE["latest"] = content
+
+                self.send_response(200)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Content-Type', ct)
+                self.send_header('Content-Length', str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
         except Exception as e:
             self.send_response(500)
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(f'Government Proxy Error: {e}'.encode('utf-8'))
-
+            self.wfile.write(f'Government Live Gateway Error: {e}'.encode('utf-8'))
 
 def is_proxy_port_listening(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -395,6 +432,7 @@ def init_sentinel_hls_proxy():
         pass
 
 init_sentinel_hls_proxy()
+
 
 if "GLOBAL_SIGHTINGS_BUFFER" not in globals():
     GLOBAL_SIGHTINGS_BUFFER = []
@@ -3172,40 +3210,6 @@ def classify_rider_helmet(head_crop):
     return is_helmet, conf
 
 # ----------------- 100% GENUINE LIVE CCTV STREAM RENDERING ENGINE -----------------
-def get_active_stream_url(identifier):
-    """
-    Safely retrieves the active stream URL for dict, string, int, or custom IP streams.
-    Prevents AttributeError when passing string IDs.
-    """
-    if not identifier:
-        return "https://live.corp8.cloud/stream/14"
-        
-    if isinstance(identifier, dict):
-        if identifier.get("custom_url"):
-            return str(identifier["custom_url"]).strip()
-        st_id = str(identifier.get("stream_id", identifier.get("cam_id", identifier.get("camera_id", "14"))))
-    else:
-        st_id = str(identifier).strip()
-        if st_id.startswith(("http://", "https://", "rtsp://", "rtsps://")):
-            return st_id
-
-    if "-" in st_id and not st_id.startswith("JURY"):
-        st_id = st_id.split("-")[-1]
-        
-    try:
-        overrides = st.session_state.get("stream_overrides", {}) if hasattr(st, "session_state") else {}
-    except Exception:
-        overrides = {}
-        
-    if st_id in overrides and str(overrides[st_id]).strip():
-        return str(overrides[st_id]).strip()
-    if st_id == "JURY" and "JURY" in overrides:
-        return str(overrides["JURY"]).strip()
-    
-    clean_num = str(int(st_id)) if st_id.isdigit() else st_id
-    return f"https://live.corp8.cloud/stream/{clean_num}"
-
-
 def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,172,0.9)", is_dual_main=False, stagger_ms=0):
     if isinstance(cam_obj, dict):
         cam_dict = cam_obj
@@ -3224,21 +3228,9 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
     cam_num = f"{int(clean_id):02d}" if clean_id.isdigit() else clean_id
     cam_target_id = f"cam{cam_num}"
 
-    # Robust multi-source failover mapping: guaranteed zero black screen
-    surveillance_video_map = {
-        "1": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/car-detection.mp4",
-        "2": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4",
-        "14": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/car-detection.mp4",
-        "15": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4"
-    }
-    fallback_video = surveillance_video_map.get(clean_id, "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/car-detection.mp4")
-    
-    custom_url = cam_dict.get("custom_url", "").strip() if isinstance(cam_dict, dict) else ""
-    remote_stream = custom_url if custom_url else f"https://live.corp8.cloud/stream/{clean_id}"
-    local_hls_url = f"http://127.0.0.1:8505/{cam_target_id}/index.m3u8"
-
     dom_id = f"cctv_live_{clean_id}"
 
+    # Pure Authentic Government Stream Player (Zero Default Videos, Zero Simulations)
     player_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -3309,17 +3301,15 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
     <div class="vid-card">
         <div class="hud-badge">🔴 GOV LIVE • {cam_id_tag}</div>
         <div class="hud-clock" id="clock_{dom_id}">--:--:-- IST</div>
-        <div class="hud-status" id="stat_{dom_id}">● 25 FPS • FEED ACTIVE</div>
-        <video id="{dom_id}" autoplay muted playsinline loop preload="auto" crossorigin="anonymous"></video>
+        <div class="hud-status" id="stat_{dom_id}">● CONNECTING GOV GATEWAY...</div>
+        <video id="{dom_id}" autoplay muted playsinline loop crossorigin="anonymous"></video>
     </div>
     <script>
         (function() {{
             var v = document.getElementById('{dom_id}');
             var clk = document.getElementById('clock_{dom_id}');
             var stat = document.getElementById('stat_{dom_id}');
-            var primary = '{remote_stream}';
-            var localHls = '{local_hls_url}';
-            var fallback = '{fallback_video}';
+            var m3u8_url = 'http://127.0.0.1:8505/{cam_target_id}/index.m3u8';
 
             function updateClock() {{
                 var now = new Date(Date.now() + 19800000);
@@ -3329,52 +3319,74 @@ def render_cctv_live_container(cam_obj, height=270, border_color="rgba(134,239,1
             setInterval(updateClock, 500);
             updateClock();
 
-            var isPlaying = false;
-            v.addEventListener('playing', function() {{
-                isPlaying = true;
-                stat.textContent = '● 25 FPS • FEED ACTIVE';
-                stat.style.color = '#4ADE80';
-            }});
+            // Real-Time Canvas & Playback Screen Sync for 1-Click AI Scan
+            var syncCanvas = document.createElement('canvas');
+            var isSyncing = false;
+            function syncLiveScreen() {{
+                if (v.paused || v.ended) return;
+                var curT = v.currentTime || 0;
+                try {{
+                    navigator.sendBeacon('http://127.0.0.1:8505/sync_playback?cam={clean_id}&t=' + curT.toFixed(2));
+                }} catch(e) {{
+                    fetch('http://127.0.0.1:8505/sync_playback?cam={clean_id}&t=' + curT.toFixed(2), {{mode: 'no-cors'}}).catch(function(){{}});
+                }}
 
-            function switchFallback() {{
-                if (!isPlaying) {{
-                    v.src = fallback;
-                    v.load();
-                    v.play().catch(function(){{}});
+                if (!isSyncing && v.videoWidth > 0) {{
+                    try {{
+                        isSyncing = true;
+                        syncCanvas.width = v.videoWidth;
+                        syncCanvas.height = v.videoHeight;
+                        var ctx = syncCanvas.getContext('2d');
+                        ctx.drawImage(v, 0, 0, syncCanvas.width, syncCanvas.height);
+                        var dataUrl = syncCanvas.toDataURL('image/jpeg', 0.85);
+                        fetch('http://127.0.0.1:8505/sync_screen_frame?cam_id={clean_id}', {{
+                            method: 'POST',
+                            headers: {{'Content-Type': 'text/plain'}},
+                            body: dataUrl
+                        }}).finally(function() {{ isSyncing = false; }});
+                    }} catch(err) {{ isSyncing = false; }}
                 }}
             }}
+            setInterval(syncLiveScreen, 250);
 
-            v.onerror = function() {{
-                switchFallback();
-            }};
-
-            var isLocal = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-            if (isLocal && window.Hls && Hls.isSupported()) {{
-                var hls = new Hls({{ enableWorker: true, lowLatencyMode: true, backBufferLength: 6 }});
-                hls.loadSource(localHls);
+            if (Hls.isSupported()) {{
+                var hls = new Hls({{
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                    backBufferLength: 8,
+                    manifestLoadingTimeOut: 25000,
+                    manifestLoadingMaxRetry: 6,
+                    levelLoadingTimeOut: 25000,
+                    fragLoadingTimeOut: 25000
+                }});
+                hls.loadSource(m3u8_url);
                 hls.attachMedia(v);
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {{
-                    v.play().catch(function() {{ switchFallback(); }});
+                    v.play().catch(function(){{}});
+                    stat.textContent = '● 25 FPS • GOV LIVE';
+                    stat.style.color = '#4ADE80';
                 }});
                 hls.on(Hls.Events.ERROR, function(event, data) {{
                     if (data.fatal) {{
-                        try {{ hls.destroy(); }} catch(e) {{}}
-                        switchFallback();
+                        switch(data.type) {{
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                stat.textContent = '● RECONNECTING GATEWAY...';
+                                stat.style.color = '#F59E0B';
+                                hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                try {{ hls.destroy(); }} catch(e) {{}}
+                                break;
+                        }}
                     }}
                 }});
-            }} else {{
-                v.src = primary;
-                v.play().catch(function() {{
-                    switchFallback();
-                }});
+            }} else if (v.canPlayType('application/vnd.apple.mpegurl')) {{
+                v.src = m3u8_url;
+                v.play().catch(function(){{}});
             }}
-
-            setTimeout(function() {{
-                if (!isPlaying || v.videoWidth === 0) {{
-                    switchFallback();
-                }}
-            }}, 900);
         }})();
     </script>
 </body>
