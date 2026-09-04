@@ -283,9 +283,25 @@ class ReusableHLSProxyServer(socketserver.ThreadingMixIn, socketserver.TCPServer
     allow_reuse_address = True
     daemon_threads = True
 
+    def handle_error(self, request, client_address):
+        # Silently suppress harmless client disconnects / WinError 10053 / ConnectionAbortedError
+        pass
+
 class GovernmentHLSProxyHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
+
+    def handle(self):
+        try:
+            super().handle()
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+            pass
+
+    def finish(self):
+        try:
+            super().finish()
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+            pass
 
     def do_OPTIONS(self):
         self.send_response(200)
